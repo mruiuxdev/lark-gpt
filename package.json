@@ -10,7 +10,8 @@
   "main": "index.js",
   "devDependencies": {},
   "scripts": {
-    "start": "npm run start api/index.js"
+    "start": "npm run start ./api/index.js",
+    "dev": "nodemon ./api/index.js"
   },
   "keywords": [],
   "author": "",
