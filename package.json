@@ -2,13 +2,13 @@
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.29.0",
     "axios": "^1.7.2",
+    "express": "^4.19.2",
     "mongodb": "^6.7.0"
   },
   "name": "lark-gpt",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "devDependencies": {},
   "scripts": {
     "start": "npm run start ./api/index.js",
     "dev": "nodemon ./api/index.js"

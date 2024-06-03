@@ -1,6 +1,7 @@
+const express = require("express");
 const lark = require("@larksuiteoapi/node-sdk");
 const axios = require("axios");
-const { MongoClient } = require("mongodb"); // Example: Using MongoDB with MongoDB Atlas
+const { MongoClient } = require("mongodb");
 const { ObjectId } = require("mongodb");
 
 const LARK_APP_ID = process.env.APPID || "";
@@ -16,7 +17,6 @@ const client = new lark.Client({
   domain: lark.Domain.Lark,
 });
 
-// Example MongoDB connection setup
 let db;
 
 async function connectToDatabase() {
@@ -126,7 +126,6 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   const question = userInput.text.replace("@_user_1", "").trim();
 
   if (question.startsWith("/")) {
-    // Handle commands
     switch (question) {
       case "/help":
         await cmdHelp(messageId);
@@ -148,7 +147,6 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   await saveConversation(sessionId, question, openaiResponse);
   await reply(messageId, openaiResponse);
 
-  // Update content to the event record
   const collection = db.collection("event");
   await collection.updateOne(
     { event_id: eventId },
@@ -158,11 +156,13 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   return { code: 0 };
 }
 
-module.exports = async function (params, context) {
+module.exports = async function (req, res) {
+  const params = req.body;
+
   if (params.type === "url_verification") {
-    return {
+    return res.json({
       challenge: params.challenge,
-    };
+    });
   }
 
   if (!db) {
@@ -176,35 +176,44 @@ module.exports = async function (params, context) {
     const senderId = params.event.sender.sender_id.user_id;
     const sessionId = chatId + senderId;
 
-    // Process event only once
     const collection = db.collection("event");
     const count = await collection.countDocuments({ event_id: eventId });
 
     if (count !== 0) {
       console.log("Skip repeat event");
-      return { code: 1 };
+      return res.json({ code: 1 });
     }
 
     await collection.insertOne({ event_id: eventId });
 
-    // Replay in private chat
     if (params.event.message.chat_type === "p2p") {
       if (params.event.message.message_type !== "text") {
         await reply(messageId, "Only text format is supported.");
-        return { code: 0 };
+        return res.json({ code: 0 });
       }
 
       const userInput = JSON.parse(params.event.message.content);
-      return await handleReply(userInput, sessionId, messageId, eventId);
+      const result = await handleReply(
+        userInput,
+        sessionId,
+        messageId,
+        eventId
+      );
+      return res.json(result);
     }
 
-    // Group chat process
     if (params.event.message.chat_type === "group") {
       const userInput = JSON.parse(params.event.message.content);
-      return await handleReply(userInput, sessionId, messageId, eventId);
+      const result = await handleReply(
+        userInput,
+        sessionId,
+        messageId,
+        eventId
+      );
+      return res.json(result);
     }
   }
 
   console.log("Return without other logs");
-  return { code: 2 };
+  return res.json({ code: 2 });
 };
