@@ -11,8 +11,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npm run start ./api/index.js",
-    "dev": "nodemon ./api/index.js"
+    "start": "npm run start server",
+    "dev": "nodemon server"
   },
   "keywords": [],
   "author": "",
