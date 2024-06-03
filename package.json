@@ -10,10 +10,10 @@
   "name": "lark-gpt",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "index.js",
   "scripts": {
-    "start": "npm run start main",
-    "dev": "nodemon main"
+    "start": "npm run start index",
+    "dev": "nodemon index"
   },
   "keywords": [],
   "author": "",
