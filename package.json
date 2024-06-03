@@ -12,7 +12,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npm run start index",
+    "start": "node index",
     "dev": "nodemon index"
   },
   "keywords": [],
