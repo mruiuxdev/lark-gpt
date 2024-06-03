@@ -4,15 +4,16 @@
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongodb": "^6.7.0"
+    "mongodb": "^6.7.0",
+    "mongoose": "^8.4.1"
   },
   "name": "lark-gpt",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "start": "npm run start server",
-    "dev": "nodemon server"
+    "start": "npm run start main",
+    "dev": "nodemon main"
   },
   "keywords": [],
   "author": "",
