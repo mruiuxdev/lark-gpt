@@ -3,6 +3,9 @@ const lark = require("@larksuiteoapi/node-sdk");
 const axios = require("axios");
 const { MongoClient } = require("mongodb");
 const { ObjectId } = require("mongodb");
+const dotenv = require("dotenv");
+
+dotenv.config({});
 
 const LARK_APP_ID = process.env.APPID || "";
 const LARK_APP_SECRET = process.env.SECRET || "";
