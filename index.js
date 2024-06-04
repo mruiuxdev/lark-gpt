@@ -140,7 +140,6 @@ async function cmdClear(sessionId, messageId) {
 
 async function getOpenAIReply(prompt) {
   const data = JSON.stringify({
-    model: OPENAI_MODEL,
     messages: prompt,
   });
 
