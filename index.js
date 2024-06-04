@@ -150,6 +150,7 @@ async function getFunctionAPIReply(prompt) {
     if (response.status === 429) {
       return "Too many requests, please try again later.";
     }
+    console.log(response);
     return response.data.text; // Adjust this line based on the actual API response structure
   } catch (e) {
     logger(e.response.data);
@@ -220,6 +221,7 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
 
 app.post("/webhook", async (req, res) => {
   const params = req.body;
+  console.log(params);
   if (params.encrypt) {
     logger("user enable encrypt key");
     return res.json({
