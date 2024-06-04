@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import fetch from "node-fetch";
-import { marked } from "marked";
+import showdown from "showdown";
 
 dotenv.config();
 
@@ -219,10 +219,13 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
       console.error("Error:", error);
     });
 
-  const formattedResponse = marked.parse(openaiResponse);
+  const cleanedResponse = openaiResponse
+    .replace(/\*\*AI:\*\* /g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "");
 
-  await saveConversation(sessionId, question, formattedResponse);
-  await reply(messageId, formattedResponse);
+  await saveConversation(sessionId, question, cleanedResponse);
+  await reply(messageId, cleanedResponse);
 
   try {
     await new Event({ event_id: eventId, content: userInput.text }).save();
@@ -326,5 +329,12 @@ app.listen(port, () => {
 
 // Test
 // query({ question: "How can you help me?" })
-//   .then((res) => console.log(marked.parse(res.text)))
+//   .then((res) =>
+//     console.log(
+//       res.text
+//         .replace(/\*\*AI:\*\* /g, "") // Remove the **AI:** prefix
+//         .replace(/\*\*/g, "") // Remove ** for bold text
+//         .replace(/\*/g, "")
+//     )
+//   )
 //   .catch((e) => console.log(e));
