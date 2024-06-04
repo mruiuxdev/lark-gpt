@@ -219,13 +219,8 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
       console.error("Error:", error);
     });
 
-  const cleanedResponse = openaiResponse
-    .replace(/\*\*AI:\*\* /g, "")
-    .replace(/\*\*/g, "")
-    .replace(/\*/g, "");
-
-  await saveConversation(sessionId, question, cleanedResponse);
-  await reply(messageId, cleanedResponse);
+  await saveConversation(sessionId, question, openaiResponse);
+  await reply(messageId, openaiResponse);
 
   try {
     await new Event({ event_id: eventId, content: userInput.text }).save();
@@ -332,9 +327,6 @@ app.listen(port, () => {
 //   .then((res) =>
 //     console.log(
 //       res.text
-//         .replace(/\*\*AI:\*\* /g, "") // Remove the **AI:** prefix
-//         .replace(/\*\*/g, "") // Remove ** for bold text
-//         .replace(/\*/g, "")
 //     )
 //   )
 //   .catch((e) => console.log(e));
