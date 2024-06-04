@@ -139,31 +139,32 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, "✅ All history removed");
 }
 
-async function query(data) {
-  try {
-    const response = await axios.post(
-      "https://chatflow-aowb.onrender.com/api/v1/prediction/a6dfcf0e-8c63-4515-8f71-b41abaa45bbe",
-      data,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error querying custom API:", error);
-    throw new Error("Failed to query the custom API");
-  }
-}
-
 async function getOpenAIReply(prompt) {
+  const data = JSON.stringify({
+    model: OPENAI_MODEL,
+    messages: prompt,
+  });
+
+  const config = {
+    method: "post",
+    maxBodyLength: Infinity,
+    url: "https://api.openai.com/v1/chat/completions",
+    headers: {
+      Authorization: `Bearer ${OPENAI_KEY}`,
+      "Content-Type": "application/json",
+    },
+    data: data,
+    timeout: 50000,
+  };
+
   try {
-    const data = { question: prompt.map((p) => p.content).join(" ") };
-    const response = await query(data);
-    return response.answer;
+    const response = await axios(config);
+    if (response.status === 429) {
+      return "Too many questions, can you wait and re-ask later?";
+    }
+    return response.data.choices[0].message.content.replace("\n\n", "");
   } catch (e) {
-    logger(e);
+    logger(e.response.data);
     return "This question is too difficult, you may ask my owner.";
   }
 }
