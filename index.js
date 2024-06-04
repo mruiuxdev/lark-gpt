@@ -161,14 +161,6 @@ async function query(data) {
   }
 }
 
-// query({ question: "Hey, how are you?" })
-//   .then((response) => {
-//     console.log(response);
-//   })
-//   .catch((error) => {
-//     console.error("Error:", error);
-//   });
-
 async function doctor() {
   if (LARK_APP_ID === "") {
     return {
@@ -211,7 +203,7 @@ async function doctor() {
 }
 
 async function handleReply(userInput, sessionId, messageId, eventId) {
-  const question = userInput.text.replace("@_user_1", "");
+  const question = userInput.text.replace("@_user_1", "").trim();
   logger("question: " + question);
   const action = question.trim();
   if (action.startsWith("/")) {
@@ -220,7 +212,7 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   const prompt = await buildConversation(sessionId, question);
   const openaiResponse = await query({ question: prompt })
     .then((response) => {
-      console.log(response);
+      return response.text; // Extract the text field from the response
     })
     .catch((error) => {
       console.error("Error:", error);
@@ -309,3 +301,8 @@ app.get("/hello", (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+// Test
+// query({ question: "How are you?" })
+//   .then((res) => console.log(res))
+//   .catch((e) => console.log(e));
