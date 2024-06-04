@@ -11,9 +11,7 @@ const port = process.env.PORT || 3000;
 
 const LARK_APP_ID = process.env.APPID || "";
 const LARK_APP_SECRET = process.env.SECRET || "";
-const OPENAI_KEY = process.env.KEY || "";
-const OPENAI_MODEL = process.env.MODEL || "gpt-3.5-turbo";
-const OPENAI_MAX_TOKEN = process.env.MAX_TOKEN || 1024;
+const FUNCTION_API_URL = process.env.FUNCTION_API_URL || "";
 
 const client = new lark.Client({
   appId: LARK_APP_ID,
@@ -139,18 +137,14 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, "✅ All history removed");
 }
 
-async function getOpenAIReply(prompt) {
-  const data = JSON.stringify({
-    model: OPENAI_MODEL,
-    messages: prompt,
-  });
+async function getFunctionAPIReply(prompt) {
+  const data = JSON.stringify({ messages: prompt });
 
   const config = {
     method: "post",
     maxBodyLength: Infinity,
-    url: "https://api.openai.com/v1/chat/completions",
+    url: FUNCTION_API_URL,
     headers: {
-      Authorization: `Bearer ${OPENAI_KEY}`,
       "Content-Type": "application/json",
     },
     data: data,
@@ -160,9 +154,9 @@ async function getOpenAIReply(prompt) {
   try {
     const response = await axios(config);
     if (response.status === 429) {
-      return "Too many questions, can you wait and re-ask later?";
+      return "Too many requests, please try again later.";
     }
-    return response.data.choices[0].message.content.replace("\n\n", "");
+    return response.data.reply; // Adjust this line based on the actual API response structure
   } catch (e) {
     logger(e.response.data);
     return `This question is too difficult, you may ask my owner. \n\n ${e.response.data}`;
@@ -200,26 +194,6 @@ async function doctor() {
       },
     };
   }
-  if (OPENAI_KEY === "") {
-    return {
-      code: 1,
-      message: {
-        zh_CN: "你没有配置 OpenAI 的 Key，请检查 & 部署后重试",
-        en_US: "Here is no OpenAI Key, please check & re-Deploy & call again",
-      },
-    };
-  }
-  if (!OPENAI_KEY.startsWith("sk-")) {
-    return {
-      code: 1,
-      message: {
-        zh_CN:
-          "你配置的 OpenAI Key 是错误的，请检查后重试。OpenAI 的 KEY 以 sk- 开头。",
-        en_US:
-          "Your OpenAI Key is Wrong, Please Check and call again. Lark APPID must Start with cli",
-      },
-    };
-  }
   return {
     code: 0,
     message: {
@@ -230,8 +204,6 @@ async function doctor() {
     },
     meta: {
       LARK_APP_ID,
-      OPENAI_MODEL,
-      OPENAI_MAX_TOKEN,
     },
   };
 }
@@ -244,9 +216,9 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
     return await cmdProcess({ action, sessionId, messageId });
   }
   const prompt = await buildConversation(sessionId, question);
-  const openaiResponse = await getOpenAIReply(prompt);
-  await saveConversation(sessionId, question, openaiResponse);
-  await reply(messageId, openaiResponse);
+  const functionAPIResponse = await getFunctionAPIReply(prompt);
+  await saveConversation(sessionId, question, functionAPIResponse);
+  await reply(messageId, functionAPIResponse);
 
   await new Event({ event_id: eventId, content: userInput.text }).save();
   return { code: 0 };
