@@ -221,6 +221,13 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   }
   const prompt = await buildConversation(sessionId, question);
   const openaiResponse = await getOpenAIReply(prompt);
+
+  // Validate content before saving
+  if (!openaiResponse || openaiResponse.trim() === "") {
+    await reply(messageId, "Error: OpenAI response must not be null or empty.");
+    return { code: 0 };
+  }
+
   await saveConversation(sessionId, question, openaiResponse);
   await reply(messageId, openaiResponse);
 
@@ -266,24 +273,24 @@ app.post("/webhook", async (req, res) => {
 
     await new Event({ event_id: eventId }).save();
 
-    if (params.event.message.chat_type === "p2p") {
-      if (params.event.message.message_type != "text") {
+    if (
+      params.event.message.chat_type === "p2p" ||
+      params.event.message.chat_type === "group"
+    ) {
+      if (params.event.message.message_type !== "text") {
         await reply(messageId, "Not support other format question, only text.");
         logger("skip and reply not support");
         return res.json({ code: 0 });
       }
-      const userInput = JSON.parse(params.event.message.content);
-      const result = await handleReply(
-        userInput,
-        sessionId,
-        messageId,
-        eventId
-      );
-      return res.json(result);
-    }
 
-    if (params.event.message.chat_type === "group") {
       const userInput = JSON.parse(params.event.message.content);
+
+      // Validate content before processing
+      if (!userInput.text || userInput.text.trim() === "") {
+        await reply(messageId, "Error: Content must not be null or empty.");
+        return res.json({ code: 0 });
+      }
+
       const result = await handleReply(
         userInput,
         sessionId,
