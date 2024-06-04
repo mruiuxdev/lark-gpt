@@ -92,9 +92,17 @@ async function buildConversation(sessionId, question) {
 }
 
 async function saveConversation(sessionId, question, answer) {
-  const msgSize = question.length + answer.length;
-  await new Msg({ sessionId, question, answer, msgSize }).save();
-  discardConversation(sessionId);
+  try {
+    if (!question || !answer) {
+      throw new Error("Question or answer is missing or empty.");
+    }
+    const msgSize = question.length + answer.length;
+    await new Msg({ sessionId, question, answer, msgSize }).save();
+    await discardConversation(sessionId);
+  } catch (error) {
+    logger("Error saving conversation:", error);
+    throw error; // Propagate the error further if needed
+  }
 }
 
 async function discardConversation(sessionId) {
