@@ -95,12 +95,6 @@ async function discardConversation(sessionId) {
       totalSize,
     });
   });
-
-  for (const c of countList) {
-    if (c.totalSize > OPENAI_MAX_TOKEN) {
-      await Msg.deleteOne({ _id: c.msgId });
-    }
-  }
 }
 
 async function clearConversation(sessionId) {
