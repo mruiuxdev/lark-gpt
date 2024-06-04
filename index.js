@@ -217,10 +217,22 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
     .catch((error) => {
       console.error("Error:", error);
     });
-  await saveConversation(sessionId, question, openaiResponse);
-  await reply(messageId, openaiResponse);
 
-  await new Event({ event_id: eventId, content: userInput.text }).save();
+  const formattedResponse = marked.parse(openaiResponse);
+
+  await saveConversation(sessionId, question, formattedResponse);
+  await reply(messageId, formattedResponse);
+
+  try {
+    await new Event({ event_id: eventId, content: userInput.text }).save();
+  } catch (error) {
+    if (error.code === 11000) {
+      logger("Duplicate event ID:", eventId);
+      return { code: 1, message: "Duplicate event ID" };
+    } else {
+      throw error;
+    }
+  }
   return { code: 0 };
 }
 
@@ -260,7 +272,16 @@ app.post("/webhook", async (req, res) => {
       return res.json({ code: 1 });
     }
 
-    await new Event({ event_id: eventId }).save();
+    try {
+      await new Event({ event_id: eventId }).save();
+    } catch (error) {
+      if (error.code === 11000) {
+        logger("Duplicate event ID:", eventId);
+        return res.json({ code: 1, message: "Duplicate event ID" });
+      } else {
+        throw error;
+      }
+    }
 
     if (params.event.message.chat_type === "p2p") {
       if (params.event.message.message_type != "text") {
@@ -295,14 +316,14 @@ app.post("/webhook", async (req, res) => {
 });
 
 app.get("/hello", (req, res) => {
-  res.json({ message: "Hello, world!" });
+  res.json({ message: "Hello, World!" });
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });
 
 // Test
-// query({ question: "How are you?" })
-//   .then((res) => console.log(res))
-//   .catch((e) => console.log(e));
+query({ question: "How can you help me?" })
+  .then((res) => console.log(res))
+  .catch((e) => console.log(e));
