@@ -1,18 +1,17 @@
-const express = require("express");
-const lark = require("@larksuiteoapi/node-sdk");
-const axios = require("axios");
-const mongoose = require("mongoose");
-const dotenv = require("dotenv");
+import lark from "@larksuiteoapi/node-sdk";
+import dotenv from "dotenv";
+import express from "express";
+import mongoose from "mongoose";
+import fetch from "node-fetch";
 
-dotenv.config({});
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-const LARK_APP_ID = process.env.APPID || "";
-const LARK_APP_SECRET = process.env.SECRET || "";
-const FLOWISE_API_KEY = process.env.FLOWISE_API_KEY || "";
-const MAX_TOKEN = process.env.MAX_TOKEN || 1024;
+const LARK_APP_ID = process.env.LARK_APP_ID || "";
+const LARK_APP_SECRET = process.env.LARK_APP_SECRET || "";
+const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
 
 const client = new lark.Client({
   appId: LARK_APP_ID,
@@ -21,7 +20,6 @@ const client = new lark.Client({
   domain: lark.Domain.Lark,
 });
 
-// Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("Database connected successfully"))
@@ -47,6 +45,21 @@ app.use(express.json());
 
 function logger(param) {
   console.error(`[CF]`, param);
+}
+
+async function cmdProcess(cmdParams) {
+  switch (cmdParams && cmdParams.action) {
+    case "/help":
+      await cmdHelp(cmdParams.messageId);
+      break;
+    case "/clear":
+      await cmdClear(cmdParams.sessionId, cmdParams.messageId);
+      break;
+    default:
+      await cmdHelp(cmdParams.messageId);
+      break;
+  }
+  return { code: 0 };
 }
 
 async function reply(messageId, content) {
@@ -98,7 +111,7 @@ async function discardConversation(sessionId) {
   });
 
   for (const c of countList) {
-    if (c.totalSize > MAX_TOKEN) {
+    if (c.totalSize > 1024) {
       await Msg.deleteOne({ _id: c.msgId });
     }
   }
@@ -106,21 +119,6 @@ async function discardConversation(sessionId) {
 
 async function clearConversation(sessionId) {
   await Msg.deleteMany({ sessionId });
-}
-
-async function cmdProcess(cmdParams) {
-  switch (cmdParams && cmdParams.action) {
-    case "/help":
-      await cmdHelp(cmdParams.messageId);
-      break;
-    case "/clear":
-      await cmdClear(cmdParams.sessionId, cmdParams.messageId);
-      break;
-    default:
-      await cmdHelp(cmdParams.messageId);
-      break;
-  }
-  return { code: 0 };
 }
 
 async function cmdHelp(messageId) {
@@ -138,41 +136,36 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, "✅ All history removed");
 }
 
-async function getOpenAIReply(prompt) {
-  const data = JSON.stringify({
-    messages: prompt,
-  });
-
-  const config = {
-    method: "post",
-    maxBodyLength: Infinity,
-    url: `${process.env.FUNCTION_API_URL}`,
-    headers: {
-      Authorization: `Bearer ${FLOWISE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    data: data,
-    timeout: 50000,
-  };
-
+async function query(data) {
   try {
-    const response = await axios(config);
-    if (response.status === 429) {
-      return "Too many questions, can you wait and re-ask later?";
-    }
-    return response.data.choices[0].message.content.replace("\n\n", "");
-  } catch (e) {
-    logger(e.response.data);
-    return "This question is too difficult, you may ask my owner.";
+    const response = await fetch(`${FLOWISE_API_URL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Error querying API:", error);
+    throw error;
   }
 }
+
+// query({ question: "Hey, how are you?" })
+//   .then((response) => {
+//     console.log(response);
+//   })
+//   .catch((error) => {
+//     console.error("Error:", error);
+//   });
 
 async function doctor() {
   if (LARK_APP_ID === "") {
     return {
       code: 1,
       message: {
-        zh_CN: "你没有配置 Lark 应用的 AppID，请检查 & 部署后重试",
         en_US: "Here is no Lark APP id, please check & re-Deploy & call again",
       },
     };
@@ -181,8 +174,6 @@ async function doctor() {
     return {
       code: 1,
       message: {
-        zh_CN:
-          "你配置的 Lark 应用的 AppID 是错误的，请检查后重试。 Lark 应用的 APPID 以 cli_ 开头。",
         en_US:
           "Your Lark App ID is Wrong, Please Check and call again. Lark APPID must Start with cli",
       },
@@ -192,18 +183,8 @@ async function doctor() {
     return {
       code: 1,
       message: {
-        zh_CN: "你没有配置 Lark 应用的 Secret，请检查 & 部署后重试",
         en_US:
           "Here is no Lark APP Secret, please check & re-Deploy & call again",
-      },
-    };
-  }
-  if (FLOWISE_API_KEY === "") {
-    return {
-      code: 1,
-      message: {
-        zh_CN: "你没有配置 OpenAI 的 Key，请检查 & 部署后重试",
-        en_US: "Here is no OpenAI Key, please check & re-Deploy & call again",
       },
     };
   }
@@ -217,7 +198,6 @@ async function doctor() {
     },
     meta: {
       LARK_APP_ID,
-      MAX_TOKEN,
     },
   };
 }
@@ -230,7 +210,13 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
     return await cmdProcess({ action, sessionId, messageId });
   }
   const prompt = await buildConversation(sessionId, question);
-  const openaiResponse = await getOpenAIReply(prompt);
+  const openaiResponse = await query({ question: prompt })
+    .then((response) => {
+      console.log(response);
+    })
+    .catch((error) => {
+      console.error("Error:", error);
+    });
   await saveConversation(sessionId, question, openaiResponse);
   await reply(messageId, openaiResponse);
 
