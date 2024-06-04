@@ -11,8 +11,6 @@ const port = process.env.PORT || 3000;
 
 const LARK_APP_ID = process.env.APPID || "";
 const LARK_APP_SECRET = process.env.SECRET || "";
-const OPENAI_KEY = process.env.KEY || "";
-const OPENAI_MODEL = process.env.MODEL || "gpt-3.5-turbo";
 const OPENAI_MAX_TOKEN = process.env.MAX_TOKEN || 1024;
 
 const client = new lark.Client({
@@ -157,14 +155,14 @@ async function query(data) {
   }
 }
 
-async function getOpenAIReply(prompt) {
+async function getCustomAPIReply(prompt) {
   try {
     const data = { question: prompt.map((p) => p.content).join(" ") };
     const response = await query(data);
     return response.answer;
   } catch (e) {
     logger(e);
-    return "This question is too difficult, you may ask my owner.";
+    return `This question is too difficult, you may ask my owner. ${e}`;
   }
 }
 
@@ -199,26 +197,6 @@ async function doctor() {
       },
     };
   }
-  if (OPENAI_KEY === "") {
-    return {
-      code: 1,
-      message: {
-        zh_CN: "你没有配置 OpenAI 的 Key，请检查 & 部署后重试",
-        en_US: "Here is no OpenAI Key, please check & re-Deploy & call again",
-      },
-    };
-  }
-  if (!OPENAI_KEY.startsWith("sk-")) {
-    return {
-      code: 1,
-      message: {
-        zh_CN:
-          "你配置的 OpenAI Key 是错误的，请检查后重试。OpenAI 的 KEY 以 sk- 开头。",
-        en_US:
-          "Your OpenAI Key is Wrong, Please Check and call again. Lark APPID must Start with cli",
-      },
-    };
-  }
   return {
     code: 0,
     message: {
@@ -229,7 +207,6 @@ async function doctor() {
     },
     meta: {
       LARK_APP_ID,
-      OPENAI_MODEL,
       OPENAI_MAX_TOKEN,
     },
   };
@@ -243,9 +220,9 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
     return await cmdProcess({ action, sessionId, messageId });
   }
   const prompt = await buildConversation(sessionId, question);
-  const openaiResponse = await getOpenAIReply(prompt);
-  await saveConversation(sessionId, question, openaiResponse);
-  await reply(messageId, openaiResponse);
+  const apiResponse = await getCustomAPIReply(prompt);
+  await saveConversation(sessionId, question, apiResponse);
+  await reply(messageId, apiResponse);
 
   await new Event({ event_id: eventId, content: userInput.text }).save();
   return { code: 0 };
