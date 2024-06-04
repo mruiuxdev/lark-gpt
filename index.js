@@ -153,7 +153,7 @@ async function getFunctionAPIReply(prompt) {
     return response.data.reply; // Adjust this line based on the actual API response structure
   } catch (e) {
     logger(e.response.data);
-    return `This question is too difficult, you may ask my owner. \n\n ${e.response.data}`;
+    return `This question is too difficult, you may ask my owner. \n\n ${e.text()}`;
   }
 }
 
