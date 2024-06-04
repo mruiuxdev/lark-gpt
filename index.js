@@ -150,10 +150,10 @@ async function getFunctionAPIReply(prompt) {
     if (response.status === 429) {
       return "Too many requests, please try again later.";
     }
-    return response.data.reply; // Adjust this line based on the actual API response structure
+    return response.data.text; // Adjust this line based on the actual API response structure
   } catch (e) {
     logger(e.response.data);
-    return `This question is too difficult, you may ask my owner. \n\n ${e.text()}`;
+    return `This question is too difficult, you may ask my owner.`;
   }
 }
 
