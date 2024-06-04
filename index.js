@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 const LARK_APP_ID = process.env.APPID || "";
 const LARK_APP_SECRET = process.env.SECRET || "";
-const FUNCTION_API_URL = process.env.KEY || "";
+const FUNCTION_API_URL = process.env.FUNCTION_API_URL || "";
 const MAX_TOKEN = process.env.MAX_TOKEN || "";
 
 const client = new lark.Client({
@@ -146,7 +146,7 @@ async function getOpenAIReply(prompt) {
   const config = {
     method: "post",
     maxBodyLength: Infinity,
-    url: `${process.env.FUNCTION_API_URL}`,
+    url: FUNCTION_API_URL,
     headers: {
       "Content-Type": "application/json",
     },
