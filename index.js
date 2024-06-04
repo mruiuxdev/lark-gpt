@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import fetch from "node-fetch";
+import { marked } from "marked";
 
 dotenv.config();
 
@@ -324,6 +325,6 @@ app.listen(port, () => {
 });
 
 // Test
-query({ question: "How can you help me?" })
-  .then((res) => console.log(res))
-  .catch((e) => console.log(e));
+// query({ question: "How can you help me?" })
+//   .then((res) => console.log(marked.parse(res.text)))
+//   .catch((e) => console.log(e));
