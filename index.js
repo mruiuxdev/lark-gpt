@@ -78,6 +78,16 @@ async function buildConversation(sessionId, question) {
 }
 
 async function saveConversation(sessionId, question, answer) {
+  if (!question || !answer) {
+    logger(
+      "Invalid question or answer. Question:",
+      question,
+      "Answer:",
+      answer
+    );
+    return;
+  }
+
   const msgSize = question.length + answer.length;
   await new Msg({ sessionId, question, answer, msgSize }).save();
   discardConversation(sessionId);
@@ -162,7 +172,7 @@ async function getCustomAPIReply(prompt) {
     return response.answer;
   } catch (e) {
     logger(e);
-    return `This question is too difficult, you may ask my owner. ${e}`;
+    return "This question is too difficult, you may ask my owner.";
   }
 }
 
