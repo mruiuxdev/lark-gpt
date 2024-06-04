@@ -11,8 +11,8 @@ const port = process.env.PORT || 3000;
 
 const LARK_APP_ID = process.env.APPID || "";
 const LARK_APP_SECRET = process.env.SECRET || "";
-const FUNCTION_API_URL = process.env.FUNCTION_API_URL || "";
-const MAX_TOKEN = process.env.MAX_TOKEN || "";
+const FLOWISE_API_KEY = process.env.FLOWISE_API_KEY || "";
+const MAX_TOKEN = process.env.MAX_TOKEN || 1024;
 
 const client = new lark.Client({
   appId: LARK_APP_ID,
@@ -140,18 +140,20 @@ async function cmdClear(sessionId, messageId) {
 
 async function getOpenAIReply(prompt) {
   const data = JSON.stringify({
+    model: OPENAI_MODEL,
     messages: prompt,
   });
 
   const config = {
     method: "post",
     maxBodyLength: Infinity,
-    url: FUNCTION_API_URL,
+    url: `${process.env.FUNCTION_API_URL}`,
     headers: {
+      Authorization: `Bearer ${FLOWISE_API_KEY}`,
       "Content-Type": "application/json",
     },
     data: data,
-    timeout: 60000,
+    timeout: 50000,
   };
 
   try {
@@ -159,7 +161,6 @@ async function getOpenAIReply(prompt) {
     if (response.status === 429) {
       return "Too many questions, can you wait and re-ask later?";
     }
-    console.log(response);
     return response.data.choices[0].message.content.replace("\n\n", "");
   } catch (e) {
     logger(e.response.data);
@@ -198,6 +199,15 @@ async function doctor() {
       },
     };
   }
+  if (FLOWISE_API_KEY === "") {
+    return {
+      code: 1,
+      message: {
+        zh_CN: "你没有配置 OpenAI 的 Key，请检查 & 部署后重试",
+        en_US: "Here is no OpenAI Key, please check & re-Deploy & call again",
+      },
+    };
+  }
   return {
     code: 0,
     message: {
@@ -208,6 +218,7 @@ async function doctor() {
     },
     meta: {
       LARK_APP_ID,
+      MAX_TOKEN,
     },
   };
 }
@@ -221,13 +232,6 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   }
   const prompt = await buildConversation(sessionId, question);
   const openaiResponse = await getOpenAIReply(prompt);
-
-  // Validate content before saving
-  if (!openaiResponse || openaiResponse.trim() === "") {
-    await reply(messageId, "Error: OpenAI response must not be null or empty.");
-    return { code: 0 };
-  }
-
   await saveConversation(sessionId, question, openaiResponse);
   await reply(messageId, openaiResponse);
 
@@ -273,24 +277,24 @@ app.post("/webhook", async (req, res) => {
 
     await new Event({ event_id: eventId }).save();
 
-    if (
-      params.event.message.chat_type === "p2p" ||
-      params.event.message.chat_type === "group"
-    ) {
-      if (params.event.message.message_type !== "text") {
+    if (params.event.message.chat_type === "p2p") {
+      if (params.event.message.message_type != "text") {
         await reply(messageId, "Not support other format question, only text.");
         logger("skip and reply not support");
         return res.json({ code: 0 });
       }
-
       const userInput = JSON.parse(params.event.message.content);
+      const result = await handleReply(
+        userInput,
+        sessionId,
+        messageId,
+        eventId
+      );
+      return res.json(result);
+    }
 
-      // Validate content before processing
-      if (!userInput.text || userInput.text.trim() === "") {
-        await reply(messageId, "Error: Content must not be null or empty.");
-        return res.json({ code: 0 });
-      }
-
+    if (params.event.message.chat_type === "group") {
+      const userInput = JSON.parse(params.event.message.content);
       const result = await handleReply(
         userInput,
         sessionId,
