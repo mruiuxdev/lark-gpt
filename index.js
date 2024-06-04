@@ -165,7 +165,7 @@ async function getOpenAIReply(prompt) {
     return response.data.choices[0].message.content.replace("\n\n", "");
   } catch (e) {
     logger(e.response.data);
-    return "This question is too difficult, you may ask my owner.";
+    return `This question is too difficult, you may ask my owner. \n\n ${e.response.data}`;
   }
 }
 
