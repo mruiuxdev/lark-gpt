@@ -202,6 +202,7 @@ app.post("/webhook", async (req, res) => {
 
     logger(`Received event ID: ${eventId}`);
 
+    // Check if the event ID has already been processed
     if (processedEvents.has(eventId)) {
       logger(`Event ID ${eventId} already processed, skipping.`);
       return res.json({ code: 0 });
@@ -217,7 +218,7 @@ app.post("/webhook", async (req, res) => {
       const result = await handleReply(userInput, sessionId, messageId);
       return res.json(result);
     } else if (messageType === "image") {
-      const imageKey = params.event.message.image_key;
+      const imageKey = JSON.parse(params.event.message.content).image_key;
       await handleImageMessage(messageId, imageKey);
       return res.json({ code: 0 });
     } else {
