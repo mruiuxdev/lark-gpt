@@ -147,28 +147,6 @@ async function handleReply(userInput, sessionId, messageId) {
   return { code: 0 };
 }
 
-async function handleImageMessage(messageId, imageKey) {
-  try {
-    const response = await client.im.image.get({
-      path: {
-        image_key: imageKey,
-      },
-    });
-
-    const imageBuffer = Buffer.from(response.data, "binary");
-    const imageBase64 = imageBuffer.toString("base64");
-
-    // Handle the base64 image with Flowise ChatFlow
-    const flowiseResponse = await query({ image: imageBase64 });
-    const answer = flowiseResponse.text;
-
-    await reply(messageId, answer);
-  } catch (error) {
-    console.error("Error handling image message:", error);
-    await reply(messageId, "Failed to process the image.");
-  }
-}
-
 const processedEvents = new Set();
 
 app.post("/webhook", async (req, res) => {
@@ -202,6 +180,7 @@ app.post("/webhook", async (req, res) => {
 
     logger(`Received event ID: ${eventId}`);
 
+    // Check if the event ID has already been processed
     if (processedEvents.has(eventId)) {
       logger(`Event ID ${eventId} already processed, skipping.`);
       return res.json({ code: 0 });
@@ -210,24 +189,15 @@ app.post("/webhook", async (req, res) => {
     // Add the event ID to the processed set
     processedEvents.add(eventId);
 
-    const messageType = params.event.message.message_type;
-
-    if (messageType === "text") {
-      const userInput = JSON.parse(params.event.message.content);
-      const result = await handleReply(userInput, sessionId, messageId);
-      return res.json(result);
-    } else if (messageType === "image") {
-      const imageKey = params.event.message.image_key;
-      await handleImageMessage(messageId, imageKey);
-      return res.json({ code: 0 });
-    } else {
-      await reply(
-        messageId,
-        "Not support other format question, only text and image."
-      );
+    if (params.event.message.message_type != "text") {
+      await reply(messageId, "Not support other format question, only text.");
       logger("skip and reply not support");
       return res.json({ code: 0 });
     }
+
+    const userInput = JSON.parse(params.event.message.content);
+    const result = await handleReply(userInput, sessionId, messageId);
+    return res.json(result);
   }
 
   logger("return without other log");
