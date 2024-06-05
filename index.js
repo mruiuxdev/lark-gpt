@@ -21,8 +21,8 @@ const client = new lark.Client({
 
 app.use(express.json());
 
-function logger(params) {
-  console.error(`[CF]`, params);
+function logger(...params) {
+  console.error(`[CF]`, ...params);
 }
 
 async function cmdProcess(cmdParams) {
