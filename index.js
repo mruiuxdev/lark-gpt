@@ -180,22 +180,15 @@ app.post("/webhook", async (req, res) => {
     const senderId = params.event.sender.sender_id.user_id;
     const sessionId = chatId + senderId;
 
-    if (params.event.message.chat_type === "p2p") {
-      if (params.event.message.message_type != "text") {
-        await reply(messageId, "Not support other format question, only text.");
-        logger("skip and reply not support");
-        return res.json({ code: 0 });
-      }
-      const userInput = JSON.parse(params.event.message.content);
-      const result = await handleReply(userInput, sessionId, messageId);
-      return res.json(result);
+    if (params.event.message.message_type != "text") {
+      await reply(messageId, "Not support other format question, only text.");
+      logger("skip and reply not support");
+      return res.json({ code: 0 });
     }
 
-    if (params.event.message.chat_type === "group") {
-      const userInput = JSON.parse(params.event.message.content);
-      const result = await handleReply(userInput, sessionId, messageId);
-      return res.json(result);
-    }
+    const userInput = JSON.parse(params.event.message.content);
+    const result = await handleReply(userInput, sessionId, messageId);
+    return res.json(result);
   }
 
   logger("return without other log");
@@ -209,8 +202,3 @@ app.get("/hello", (req, res) => {
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
-
-// Test
-// query({ question: "Tell me about yourself" })
-//   .then((res) => console.log(res.text))
-//   .catch((e) => console.log(e));

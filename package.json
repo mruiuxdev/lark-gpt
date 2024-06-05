@@ -3,10 +3,7 @@
     "@larksuiteoapi/node-sdk": "^1.29.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongodb": "^6.7.0",
-    "mongoose": "^8.4.1",
-    "node-fetch": "^3.3.2",
-    "showdown": "^2.1.0"
+    "node-fetch": "^3.3.2"
   },
   "name": "lark-gpt",
   "version": "1.0.0",
