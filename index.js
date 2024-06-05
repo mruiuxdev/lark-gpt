@@ -164,26 +164,30 @@ const processedEvents = new Set();
 
 app.post("/webhook", async (req, res) => {
   const params = req.body;
+
   if (params.encrypt) {
-    logger("user enable encrypt key");
+    logger("user enabled encryption key");
     return res.json({
       code: 1,
       message: {
-        en_US: "You have open Encrypt Key Feature, please close it.",
+        en_US: "You have opened the Encrypt Key feature. Please close it.",
       },
     });
   }
+
   if (params.type === "url_verification") {
-    logger("deal url_verification");
+    logger("dealing with url_verification");
     return res.json({
       challenge: params.challenge,
     });
   }
+
   if (!params.header || req.query.debug) {
-    logger("enter doctor");
+    logger("entering doctor");
     const doc = await doctor();
     return res.json(doc);
   }
+
   if (params.header.event_type === "im.message.receive_v1") {
     const eventId = params.header.event_id;
     const messageId = params.event.message.message_id;
@@ -202,18 +206,32 @@ app.post("/webhook", async (req, res) => {
     // Add the event ID to the processed set
     processedEvents.add(eventId);
 
-    if (params.event.message.message_type != "text") {
-      await reply(messageId, "Not support other format question, only text.");
-      logger("skip and reply not support");
+    // Check message type
+    const messageType = params.event.message.message_type;
+
+    if (messageType !== "text" && messageType !== "image") {
+      await reply(
+        messageId,
+        "Unsupported message format. Please send text or an image."
+      );
+      logger("skipping and replying with unsupported format");
       return res.json({ code: 0 });
     }
 
-    const userInput = JSON.parse(params.event.message.content);
+    // Handle text or image message
+    let userInput;
+    if (messageType === "text") {
+      userInput = JSON.parse(params.event.message.content);
+    } else if (messageType === "image") {
+      const imageData = JSON.parse(params.event.message.content);
+      userInput = { content: imageData };
+    }
+
     const result = await handleReply(userInput, sessionId, messageId);
     return res.json(result);
   }
 
-  logger("return without other log");
+  logger("returning without additional logs");
   return res.json({ code: 2 });
 });
 
