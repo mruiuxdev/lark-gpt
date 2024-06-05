@@ -21,6 +21,8 @@ const client = new lark.Client({
 
 app.use(express.json());
 
+const conversationHistories = {};
+
 function logger(...params) {
   console.error(`[CF]`, ...params);
 }
@@ -73,19 +75,28 @@ Usage:
 }
 
 async function cmdClear(sessionId, messageId) {
+  delete conversationHistories[sessionId];
   await reply(messageId, "✅ All history removed");
 }
 
-async function query(data) {
+async function query(data, sessionId, chatId) {
   try {
+    const history = conversationHistories[sessionId] || [];
+    history.push(data.question);
+    conversationHistories[sessionId] = history;
+
     const response = await fetch(`${FLOWISE_API_URL}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ question: history.join(" ") }),
     });
     const result = await response.json();
+
+    history.push(result.text);
+    conversationHistories[sessionId] = history;
+
     return result;
   } catch (error) {
     console.error("Error querying API:", error);
@@ -139,34 +150,12 @@ async function handleReply(userInput, sessionId, messageId) {
   if (action.startsWith("/")) {
     return await cmdProcess({ action, sessionId, messageId });
   }
-  const openaiResponse = await query({ question });
+  const openaiResponse = await query({ question }, sessionId);
 
   const answer = openaiResponse.text;
   await reply(messageId, answer);
 
   return { code: 0 };
-}
-
-async function handleImageMessage(messageId, imageKey) {
-  try {
-    const response = await client.im.image.get({
-      path: {
-        image_key: imageKey,
-      },
-    });
-
-    const imageBuffer = Buffer.from(response.data, "binary");
-    const imageBase64 = imageBuffer.toString("base64");
-
-    // Handle the base64 image with Flowise ChatFlow
-    const flowiseResponse = await query({ image: imageBase64 });
-    const answer = flowiseResponse.text;
-
-    await reply(messageId, answer);
-  } catch (error) {
-    console.error("Error handling image message:", error);
-    await reply(messageId, "Failed to process the image.");
-  }
 }
 
 const processedEvents = new Set();
@@ -202,33 +191,22 @@ app.post("/webhook", async (req, res) => {
 
     logger(`Received event ID: ${eventId}`);
 
-    // Check if the event ID has already been processed
     if (processedEvents.has(eventId)) {
       logger(`Event ID ${eventId} already processed, skipping.`);
       return res.json({ code: 0 });
     }
 
-    // Add the event ID to the processed set
     processedEvents.add(eventId);
 
-    const messageType = params.event.message.message_type;
-
-    if (messageType === "text") {
-      const userInput = JSON.parse(params.event.message.content);
-      const result = await handleReply(userInput, sessionId, messageId);
-      return res.json(result);
-    } else if (messageType === "image") {
-      const imageKey = JSON.parse(params.event.message.content).image_key;
-      await handleImageMessage(messageId, imageKey);
-      return res.json({ code: 0 });
-    } else {
-      await reply(
-        messageId,
-        "Not support other format question, only text and image."
-      );
+    if (params.event.message.message_type != "text") {
+      await reply(messageId, "Not support other format question, only text.");
       logger("skip and reply not support");
       return res.json({ code: 0 });
     }
+
+    const userInput = JSON.parse(params.event.message.content);
+    const result = await handleReply(userInput, sessionId, messageId);
+    return res.json(result);
   }
 
   logger("return without other log");
