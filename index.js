@@ -2,7 +2,6 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-import showdown from "showdown";
 
 dotenv.config();
 
