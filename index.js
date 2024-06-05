@@ -133,12 +133,26 @@ async function doctor() {
 }
 
 async function handleReply(userInput, sessionId, messageId) {
-  const content = JSON.parse(userInput.content);
-  const text = content.text;
+  let text, imageData;
 
-  if (content.image) {
+  if (typeof userInput === "string") {
+    // Assuming it's a plain text message
+    text = userInput;
+  } else if (typeof userInput === "object") {
+    // Assuming it's an object, check if it contains image data
+    const content = userInput.content;
+    if (content && content.text) {
+      text = content.text;
+    }
+    if (content && content.image) {
+      imageData = content.image;
+    }
+  } else {
+    throw new Error("Unsupported userInput format");
+  }
+
+  if (imageData) {
     // Handle image upload
-    const imageData = content.image;
     const imageResult = await query({
       question: "Describe the image",
       uploads: [
