@@ -134,7 +134,7 @@ async function doctor() {
 
 async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
-  logger("question: " + question);
+  logger("Received question: " + question);
   const action = question.trim();
   if (action.startsWith("/")) {
     return await cmdProcess({ action, sessionId, messageId });
@@ -150,7 +150,7 @@ async function handleReply(userInput, sessionId, messageId) {
 app.post("/webhook", async (req, res) => {
   const params = req.body;
   if (params.encrypt) {
-    logger("user enable encrypt key");
+    logger("User enabled encrypt key");
     return res.json({
       code: 1,
       message: {
@@ -159,35 +159,38 @@ app.post("/webhook", async (req, res) => {
     });
   }
   if (params.type === "url_verification") {
-    logger("deal url_verification");
+    logger("URL verification");
     return res.json({
       challenge: params.challenge,
     });
   }
   if (!params.header || req.query.debug) {
-    logger("enter doctor");
+    logger("Entering doctor");
     const doc = await doctor();
     return res.json(doc);
   }
   if (params.header.event_type === "im.message.receive_v1") {
-    const eventId = params.header.event_id;
     const messageId = params.event.message.message_id;
-    const chatId = params.event.message.chat_id;
-    const senderId = params.event.sender.sender_id.user_id;
-    const sessionId = chatId + senderId;
 
     if (params.event.message.message_type != "text") {
       await reply(messageId, "Not support other format question, only text.");
-      logger("skip and reply not support");
+      logger("Skipped and replied not support");
       return res.json({ code: 0 });
     }
 
     const userInput = JSON.parse(params.event.message.content);
+
+    const sessionId =
+      params.event.message.chat_id + params.event.sender.sender_id.user_id;
+    logger(
+      `Processing message with sessionId: ${sessionId}, messageId: ${messageId}`
+    );
+
     const result = await handleReply(userInput, sessionId, messageId);
     return res.json(result);
   }
 
-  logger("return without other log");
+  logger("Return without other log");
   return res.json({ code: 2 });
 });
 
