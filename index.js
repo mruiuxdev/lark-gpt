@@ -147,6 +147,8 @@ async function handleReply(userInput, sessionId, messageId) {
   return { code: 0 };
 }
 
+const processedEvents = new Set();
+
 app.post("/webhook", async (req, res) => {
   const params = req.body;
   if (params.encrypt) {
@@ -175,6 +177,17 @@ app.post("/webhook", async (req, res) => {
     const chatId = params.event.message.chat_id;
     const senderId = params.event.sender.sender_id.user_id;
     const sessionId = chatId + senderId;
+
+    logger(`Received event ID: ${eventId}`);
+
+    // Check if the event ID has already been processed
+    if (processedEvents.has(eventId)) {
+      logger(`Event ID ${eventId} already processed, skipping.`);
+      return res.json({ code: 0 });
+    }
+
+    // Add the event ID to the processed set
+    processedEvents.add(eventId);
 
     if (params.event.message.message_type != "text") {
       await reply(messageId, "Not support other format question, only text.");
