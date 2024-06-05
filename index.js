@@ -54,7 +54,11 @@ async function reply(messageId, content) {
       },
     });
   } catch (e) {
-    logger("send message to Lark error", e, messageId, content);
+    if (e && e.response && e.response.data && e.response.data.code === 230002) {
+      logger("Bot/User is not in the chat anymore", e, messageId, content);
+    } else {
+      logger("send message to Lark error", e, messageId, content);
+    }
   }
 }
 
