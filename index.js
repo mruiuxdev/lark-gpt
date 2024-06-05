@@ -21,8 +21,8 @@ const client = new lark.Client({
 
 app.use(express.json());
 
-function logger(...params) {
-  console.error(`[CF]`, ...params);
+function logger(params) {
+  console.error(`[CF]`, params);
 }
 
 async function cmdProcess(cmdParams) {
@@ -123,8 +123,6 @@ async function doctor() {
   return {
     code: 0,
     message: {
-      zh_CN:
-        "✅ 配置成功，接下来你可以在 Lark 应用当中使用机器人来完成你的工作。",
       en_US:
         "✅ Configuration is correct, you can use this bot in your Lark App",
     },
@@ -156,7 +154,6 @@ app.post("/webhook", async (req, res) => {
     return res.json({
       code: 1,
       message: {
-        zh_CN: "你配置了 Encrypt Key，请关闭该功能。",
         en_US: "You have open Encrypt Key Feature, please close it.",
       },
     });
