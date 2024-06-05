@@ -213,6 +213,7 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   const prompt = await buildConversation(sessionId, question);
   const openaiResponse = await query({ question: prompt })
     .then((response) => {
+      console.log(response);
       return response.text;
     })
     .catch((error) => {
@@ -325,10 +326,6 @@ app.listen(port, () => {
 });
 
 // Test
-// query({ question: "How can you help me?" })
-//   .then((res) =>
-//     console.log(
-//       res.text
-//     )
-//   )
+// query({ question: "What about the larksuite platform?" })
+//   .then((res) => console.log(res.text))
 //   .catch((e) => console.log(e));
