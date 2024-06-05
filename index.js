@@ -44,8 +44,8 @@ const Msg = mongoose.model("Msg", msgSchema);
 
 app.use(express.json());
 
-function logger(param) {
-  console.error(`[CF]`, param);
+function logger(...params) {
+  console.error(`[CF]`, ...params);
 }
 
 async function cmdProcess(cmdParams) {
@@ -83,7 +83,9 @@ async function reply(messageId, content) {
 
 async function buildConversation(sessionId, question) {
   const prompt = [];
-  const messages = await Msg.find({ sessionId }).sort({ createdAt: 1 });
+  const messages = await Msg.find({ sessionId })
+    .sort({ createdAt: 1 })
+    .limit(5);
   messages.forEach((row) => {
     prompt.push({ role: "user", content: row.question });
     prompt.push({ role: "assistant", content: row.answer });
@@ -152,7 +154,11 @@ async function query(data) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        question: data.question,
+        max_tokens: 150,
+        temperature: 0.7,
+      }),
     });
     const result = await response.json();
     return result;
@@ -211,17 +217,9 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
     return await cmdProcess({ action, sessionId, messageId });
   }
   const prompt = await buildConversation(sessionId, question);
-  const openaiResponse = await query({ question: prompt })
-    .then((response) => {
-      console.log(response);
-      return response.text;
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-    });
+  const openaiResponse = await query({ question: prompt });
 
-  // Directly use the text field as the response
-  const answer = openaiResponse;
+  const answer = openaiResponse.text;
   await saveConversation(sessionId, question, answer);
   await reply(messageId, answer);
 
@@ -326,6 +324,6 @@ app.listen(port, () => {
 });
 
 // Test
-// query({ question: "What about the larksuite platform?" })
+// query({ question: "Tell me about yourself" })
 //   .then((res) => console.log(res.text))
 //   .catch((e) => console.log(e));
