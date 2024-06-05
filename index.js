@@ -213,14 +213,16 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   const prompt = await buildConversation(sessionId, question);
   const openaiResponse = await query({ question: prompt })
     .then((response) => {
-      return response.text; // Extract the text field from the response
+      return response.text;
     })
     .catch((error) => {
       console.error("Error:", error);
     });
 
-  await saveConversation(sessionId, question, openaiResponse);
-  await reply(messageId, openaiResponse);
+  // Directly use the text field as the response
+  const answer = openaiResponse;
+  await saveConversation(sessionId, question, answer);
+  await reply(messageId, answer);
 
   try {
     await new Event({ event_id: eventId, content: userInput.text }).save();
