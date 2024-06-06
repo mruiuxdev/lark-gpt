@@ -203,17 +203,20 @@ app.post("/webhook", async (req, res) => {
     if (params.event.message.message_type === "text") {
       const result = await handleReply(userInput, sessionId, messageId);
       return res.json(result);
-    } else if (params.event.message.message_type === "file") {
-      const fileKey = userInput.file_key;
-      const fileUrl = await getFileUrlFromLark(fileKey);
-      const result = await query({ question: fileUrl }, sessionId);
+    } else if (params.event.message.message_type === "image") {
+      const imageKey = userInput.image_key;
+      const imageUrl = await getImageUrlFromLark(imageKey);
+      const result = await query({ question: imageUrl }, sessionId);
 
       const answer = result.text;
       await reply(messageId, answer);
 
       return res.json({ code: 0 });
     } else {
-      await reply(messageId, "Not support other format question, only text.");
+      await reply(
+        messageId,
+        "Not support other format question, only text and image."
+      );
       logger("skip and reply not support");
       return res.json({ code: 0 });
     }
@@ -223,16 +226,16 @@ app.post("/webhook", async (req, res) => {
   return res.json({ code: 2 });
 });
 
-async function getFileUrlFromLark(fileKey) {
+async function getImageUrlFromLark(imageKey) {
   try {
-    const response = await client.drive.file.download({
+    const response = await client.im.image.get({
       path: {
-        file_key: fileKey,
+        image_key: imageKey,
       },
     });
-    return response.data.url;
+    return response.data.image.url;
   } catch (error) {
-    logger("Error getting file URL from Lark:", error);
+    logger("Error getting image URL from Lark:", error);
     throw error;
   }
 }
