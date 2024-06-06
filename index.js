@@ -247,7 +247,7 @@ async function getImageUrlFromLark(imageKey) {
       `https://open.larksuite.com/open-apis/image/v4/get?image_key=${imageKey}`,
       {
         headers: {
-          Authorization: `Bearer ${await client.auth.getTenantAccessToken()}`,
+          Authorization: `Bearer t-g20666h6XJGP5SAYKWDRHHA4O3HXI3FTNQ6E2W6J`,
         },
         responseType: "arraybuffer",
       }
