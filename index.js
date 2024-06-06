@@ -79,7 +79,7 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, "✅ All history removed");
 }
 
-async function query(data, sessionId, chatId) {
+async function query(data, sessionId) {
   try {
     const history = conversationHistories[sessionId] || [];
     history.push(data.question);
@@ -198,20 +198,44 @@ app.post("/webhook", async (req, res) => {
 
     processedEvents.add(eventId);
 
-    if (params.event.message.message_type != "text") {
+    const userInput = JSON.parse(params.event.message.content);
+
+    if (params.event.message.message_type === "text") {
+      const result = await handleReply(userInput, sessionId, messageId);
+      return res.json(result);
+    } else if (params.event.message.message_type === "file") {
+      const fileKey = userInput.file_key;
+      const fileUrl = await getFileUrlFromLark(fileKey);
+      const result = await query({ question: fileUrl }, sessionId);
+
+      const answer = result.text;
+      await reply(messageId, answer);
+
+      return res.json({ code: 0 });
+    } else {
       await reply(messageId, "Not support other format question, only text.");
       logger("skip and reply not support");
       return res.json({ code: 0 });
     }
-
-    const userInput = JSON.parse(params.event.message.content);
-    const result = await handleReply(userInput, sessionId, messageId);
-    return res.json(result);
   }
 
   logger("return without other log");
   return res.json({ code: 2 });
 });
+
+async function getFileUrlFromLark(fileKey) {
+  try {
+    const response = await client.drive.file.download({
+      path: {
+        file_key: fileKey,
+      },
+    });
+    return response.data.url;
+  } catch (error) {
+    logger("Error getting file URL from Lark:", error);
+    throw error;
+  }
+}
 
 app.get("/hello", (req, res) => {
   res.json({ message: "Hello, World!" });

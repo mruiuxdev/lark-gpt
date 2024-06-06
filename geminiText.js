@@ -21,6 +21,8 @@ const client = new lark.Client({
 
 app.use(express.json());
 
+const conversationHistories = {};
+
 function logger(...params) {
   console.error(`[CF]`, ...params);
 }
@@ -73,19 +75,28 @@ Usage:
 }
 
 async function cmdClear(sessionId, messageId) {
+  delete conversationHistories[sessionId];
   await reply(messageId, "✅ All history removed");
 }
 
-async function query(data) {
+async function query(data, sessionId, chatId) {
   try {
+    const history = conversationHistories[sessionId] || [];
+    history.push(data.question);
+    conversationHistories[sessionId] = history;
+
     const response = await fetch(`${FLOWISE_API_URL}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ question: history.join(" ") }),
     });
     const result = await response.json();
+
+    history.push(result.text);
+    conversationHistories[sessionId] = history;
+
     return result;
   } catch (error) {
     console.error("Error querying API:", error);
@@ -139,7 +150,7 @@ async function handleReply(userInput, sessionId, messageId) {
   if (action.startsWith("/")) {
     return await cmdProcess({ action, sessionId, messageId });
   }
-  const openaiResponse = await query({ question });
+  const openaiResponse = await query({ question }, sessionId);
 
   const answer = openaiResponse.text;
   await reply(messageId, answer);
@@ -180,13 +191,11 @@ app.post("/webhook", async (req, res) => {
 
     logger(`Received event ID: ${eventId}`);
 
-    // Check if the event ID has already been processed
     if (processedEvents.has(eventId)) {
       logger(`Event ID ${eventId} already processed, skipping.`);
       return res.json({ code: 0 });
     }
 
-    // Add the event ID to the processed set
     processedEvents.add(eventId);
 
     if (params.event.message.message_type != "text") {
