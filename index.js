@@ -2,6 +2,8 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
+import axios from "axios";
+import { Buffer } from "buffer";
 
 dotenv.config();
 
@@ -90,7 +92,7 @@ async function query(data, sessionId) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ question: history.join(" ") }),
+      body: JSON.stringify(data),
     });
     const result = await response.json();
 
@@ -206,7 +208,20 @@ app.post("/webhook", async (req, res) => {
     } else if (params.event.message.message_type === "image") {
       const imageKey = userInput.image_key;
       const imageUrl = await getImageUrlFromLark(imageKey);
-      const result = await query({ question: imageUrl }, sessionId);
+      const imageBase64 = await convertImageToBase64(imageUrl);
+      const result = await query(
+        {
+          uploads: [
+            {
+              data: imageBase64,
+              type: "image",
+              name: "image.jpg",
+              mime: "image/jpeg",
+            },
+          ],
+        },
+        sessionId
+      );
 
       const answer = result.text;
       await reply(messageId, answer);
@@ -228,14 +243,31 @@ app.post("/webhook", async (req, res) => {
 
 async function getImageUrlFromLark(imageKey) {
   try {
-    const response = await client.im.image.get({
-      path: {
-        image_key: imageKey,
-      },
-    });
-    return response.data.image.url;
+    const response = await axios.get(
+      `https://open.larksuite.com/open-apis/image/v4/get?image_key=${imageKey}`,
+      {
+        headers: {
+          Authorization: `Bearer ${await client.auth.getTenantAccessToken()}`,
+        },
+        responseType: "arraybuffer",
+      }
+    );
+    return Buffer.from(response.data, "binary").toString("base64");
   } catch (error) {
     logger("Error getting image URL from Lark:", error);
+    throw error;
+  }
+}
+
+async function convertImageToBase64(imageUrl) {
+  try {
+    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    return `data:image/jpeg;base64,${Buffer.from(
+      response.data,
+      "binary"
+    ).toString("base64")}`;
+  } catch (error) {
+    logger("Error converting image to base64:", error);
     throw error;
   }
 }
