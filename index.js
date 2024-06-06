@@ -2,8 +2,6 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-import axios from "axios";
-import { Buffer } from "buffer";
 
 dotenv.config();
 
@@ -81,7 +79,7 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, "✅ All history removed");
 }
 
-async function query(data, sessionId) {
+async function query(data, sessionId, chatId) {
   try {
     const history = conversationHistories[sessionId] || [];
     history.push(data.question);
@@ -92,7 +90,7 @@ async function query(data, sessionId) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ question: history.join(" ") }),
     });
     const result = await response.json();
 
@@ -200,31 +198,24 @@ app.post("/webhook", async (req, res) => {
 
     processedEvents.add(eventId);
 
-    const userInput = JSON.parse(params.event.message.content);
-
     if (params.event.message.message_type === "text") {
+      const userInput = JSON.parse(params.event.message.content);
       const result = await handleReply(userInput, sessionId, messageId);
       return res.json(result);
     } else if (params.event.message.message_type === "image") {
-      const imageKey = userInput.image_key;
-      const imageUrl = await getImageUrlFromLark(imageKey);
-      const imageBase64 = await convertImageToBase64(imageUrl);
-      const result = await query(
-        {
-          uploads: [
-            {
-              data: imageBase64,
-              type: "image",
-              name: "image.jpg",
-              mime: "image/jpeg",
-            },
-          ],
-        },
-        sessionId
-      );
+      const imageKey = JSON.parse(params.event.message.content).image_key;
 
-      const answer = result.text;
-      await reply(messageId, answer);
+      try {
+        const imageResponse = await client.im.image.get({
+          params: { image_key: imageKey },
+        });
+
+        logger("Image uploaded:", imageResponse.data);
+        await reply(messageId, "Image received and logged.");
+      } catch (error) {
+        logger("Error fetching image:", error);
+        await reply(messageId, "Failed to fetch image details.");
+      }
 
       return res.json({ code: 0 });
     } else {
@@ -240,37 +231,6 @@ app.post("/webhook", async (req, res) => {
   logger("return without other log");
   return res.json({ code: 2 });
 });
-
-async function getImageUrlFromLark(imageKey) {
-  try {
-    const response = await axios.get(
-      `https://open.larksuite.com/open-apis/image/v4/get?image_key=${imageKey}`,
-      {
-        headers: {
-          Authorization: `Bearer t-g20666h6XJGP5SAYKWDRHHA4O3HXI3FTNQ6E2W6J`,
-        },
-        responseType: "arraybuffer",
-      }
-    );
-    return Buffer.from(response.data, "binary").toString("base64");
-  } catch (error) {
-    logger("Error getting image URL from Lark:", error);
-    throw error;
-  }
-}
-
-async function convertImageToBase64(imageUrl) {
-  try {
-    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    return `data:image/jpeg;base64,${Buffer.from(
-      response.data,
-      "binary"
-    ).toString("base64")}`;
-  } catch (error) {
-    logger("Error converting image to base64:", error);
-    throw error;
-  }
-}
 
 app.get("/hello", (req, res) => {
   res.json({ message: "Hello, World!" });
