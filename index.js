@@ -207,7 +207,7 @@ app.post("/webhook", async (req, res) => {
 
       try {
         const imageResponse = await client.im.image.get({
-          params: { image_key: imageKey },
+          path: { image_key: imageKey },
         });
 
         logger("Image uploaded:", imageResponse.data);
