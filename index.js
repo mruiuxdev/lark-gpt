@@ -38,17 +38,24 @@ async function cmdProcess({ action, sessionId, messageId }) {
   }
 }
 
-async function reply(messageId, content) {
-  try {
-    const plainTextContent = content.replace(/[\*_`~]/g, "\\$&");
+function formatMarkdown(text) {
+  // Replace **bold** with <strong>bold</strong>
+  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  // Replace *italic* with <em>italic</em>
+  text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  return text;
+}
 
+async function reply(messageId, content, msgType = "text") {
+  try {
+    const formattedContent = formatMarkdown(content);
     return await client.im.message.reply({
       path: { message_id: messageId },
       data: {
         content: JSON.stringify({
-          text: plainTextContent,
+          text: formattedContent,
         }),
-        msg_type: "text",
+        msg_type: msgType,
       },
     });
   } catch (e) {
