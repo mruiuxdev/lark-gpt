@@ -294,9 +294,9 @@ async function reply(messageId, content) {
         message_id: messageId,
       },
       data: {
-        content: `{"text": ${JSON.stringify({
+        content: JSON.stringify({
           text: content,
-        })}}`,
+        }),
         msg_type: "text",
         reply_in_thread: true,
       },
