@@ -40,9 +40,9 @@ async function cmdProcess({ action, sessionId, messageId }) {
 
 function formatMarkdown(text) {
   // Replace **bold** with <strong>bold</strong>
-  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
   // Replace *italic* with <em>italic</em>
-  text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
 
