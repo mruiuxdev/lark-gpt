@@ -294,10 +294,11 @@ async function reply(messageId, content) {
         message_id: messageId,
       },
       data: {
-        content: JSON.stringify({
+        content: `{"text": ${JSON.stringify({
           text: content,
-        }),
+        })}}`,
         msg_type: "text",
+        reply_in_thread: true,
       },
     });
   } catch (e) {
