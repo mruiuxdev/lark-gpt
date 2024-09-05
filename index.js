@@ -40,11 +40,13 @@ async function cmdProcess({ action, sessionId, messageId }) {
 
 async function reply(messageId, content) {
   try {
+    const plainTextContent = content.replace(/[\*_`~]/g, "\\$&");
+
     return await client.im.message.reply({
       path: { message_id: messageId },
       data: {
         content: JSON.stringify({
-          text: content,
+          text: plainTextContent,
         }),
         msg_type: "text",
       },
