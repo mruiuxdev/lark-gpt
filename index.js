@@ -40,26 +40,37 @@ async function cmdProcess({ action, sessionId, messageId }) {
 
 async function reply(messageId, content, title = "Response") {
   try {
+    const messageContent = {
+      post: {
+        en_us: {
+          title: title,
+          content: [
+            [
+              {
+                tag: "text",
+                text: content,
+              },
+            ],
+          ],
+        },
+      },
+    };
+
     return await client.im.message.reply({
       path: { message_id: messageId },
       data: {
-        content: JSON.stringify({
-          post: {
-            en_us: {
-              title: title,
-              content: [[{ tag: "text", un_escape: true, text: content }]],
-            },
-          },
-        }),
+        content: JSON.stringify(messageContent),
         msg_type: "post",
       },
     });
   } catch (e) {
     const errorCode = e?.response?.data?.code;
+    const errorMsg = e?.response?.data?.msg || "Unknown error";
+
     if (errorCode === 230002) {
       logger("Bot/User is not in the chat anymore", e, messageId, content);
     } else {
-      logger("Error sending message to Lark", e, messageId, content);
+      logger(`Error ${errorCode}: ${errorMsg}`, e, messageId, content);
     }
   }
 }
