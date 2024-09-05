@@ -298,7 +298,6 @@ async function reply(messageId, content) {
           text: content,
         }),
         msg_type: "text",
-        reply_in_thread: true,
       },
     });
   } catch (e) {
