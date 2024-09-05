@@ -61,13 +61,13 @@ async function reply(messageId, content) {
 
 async function cmdHelp(messageId) {
   const helpText = `
-  # Lark GPT Commands
+  Lark GPT Commands
 
-  **Commands**:
-  - \`/clear\`: Clear conversation history.
-  - \`/help\`: Display this help message.
+  Usage:
+  - /clear : Remove conversation history to start a new session.
+  - /help : Get more help messages.
   `;
-  await reply(messageId, helpText);
+  await reply(messageId, helpText, "Help");
 }
 
 async function cmdClear(sessionId, messageId) {
