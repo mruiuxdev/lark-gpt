@@ -21,7 +21,7 @@ const client = new lark.Client({
 
 app.use(express.json());
 
-const conversationHistories = new Map(); // Use Map for better performance
+const conversationHistories = new Map();
 
 function logger(...params) {
   console.error(`[CF]`, ...params);
@@ -38,7 +38,7 @@ async function cmdProcess({ action, sessionId, messageId }) {
   }
 }
 
-async function reply(messageId, content, title = "Response") {
+async function reply(messageId, content) {
   try {
     return await client.im.message.reply({
       path: { message_id: messageId },
@@ -67,7 +67,7 @@ async function cmdHelp(messageId) {
   - \`/clear\`: Clear conversation history.
   - \`/help\`: Display this help message.
   `;
-  await reply(messageId, helpText, "Help");
+  await reply(messageId, helpText);
 }
 
 async function cmdClear(sessionId, messageId) {
@@ -135,12 +135,10 @@ const processedEvents = new Set();
 app.post("/webhook", async (req, res) => {
   const { body: params } = req;
 
-  // Handle URL verification
   if (params.type === "url_verification") {
     return res.json({ challenge: params.challenge });
   }
 
-  // Handle encrypted requests (if encryption is enabled)
   if (params.encrypt) {
     return res.json({
       code: 1,
@@ -148,7 +146,6 @@ app.post("/webhook", async (req, res) => {
     });
   }
 
-  // Check for proper headers
   if (!params.header) {
     const configValidation = await validateAppConfig();
     return res.json(configValidation);
