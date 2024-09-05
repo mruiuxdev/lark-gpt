@@ -295,9 +295,22 @@ async function reply(messageId, content) {
       },
       data: {
         content: JSON.stringify({
-          text: content,
+          post: {
+            en_us: {
+              title: "Response",
+              content: [
+                [
+                  {
+                    tag: "text",
+                    un_escape: true,
+                    text: content,
+                  },
+                ],
+              ],
+            },
+          },
         }),
-        msg_type: "text",
+        msg_type: "post",
       },
     });
   } catch (e) {
