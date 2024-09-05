@@ -310,11 +310,12 @@ async function reply(messageId, content) {
 }
 
 async function cmdHelp(messageId) {
-  const helpText = `Lark GPT manpages
+  const helpText = `
+  # Lark GPT Commands
 
-Usage:
-    /clear    remove conversation history for get a new, clean, bot context.
-    /help     get more help message
+  **Usage**:
+  - \`/clear\` : Remove conversation history to start a new session.
+  - \`/help\` : Get more help messages.
   `;
   await reply(messageId, helpText);
 }
