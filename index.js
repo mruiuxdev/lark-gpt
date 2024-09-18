@@ -2,8 +2,6 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-import fs from 'fs';
-import path from 'path';
 
 dotenv.config();
 
@@ -29,7 +27,6 @@ function logger(...params) {
   console.error(`[CF]`, ...params);
 }
 
-// Function to process commands
 async function cmdProcess({ action, sessionId, messageId }) {
   switch (action) {
     case "/help":
@@ -42,19 +39,22 @@ async function cmdProcess({ action, sessionId, messageId }) {
 }
 
 function formatMarkdown(text) {
-  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");  // **bold**
-  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");      // *italic*
+  // Replace **bold** with <strong>bold</strong>
+  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  // Replace *italic* with <em>italic</em>
+  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
 
-// Function to reply to a message in Lark
 async function reply(messageId, content, msgType = "text") {
   try {
     const formattedContent = formatMarkdown(content);
     return await client.im.message.reply({
       path: { message_id: messageId },
       data: {
-        content: JSON.stringify({ text: formattedContent }),
+        content: JSON.stringify({
+          text: formattedContent,
+        }),
         msg_type: msgType,
       },
     });
@@ -68,54 +68,48 @@ async function reply(messageId, content, msgType = "text") {
   }
 }
 
-// Function to upload an image to Lark
-async function uploadImage(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
-    }
+async function cmdHelp(messageId) {
+  const helpText = `
+  Lark GPT Commands
 
-    const response = await client.im.image.create({
-      data: {
-        image_type: "message",
-        image: fs.createReadStream(filePath),
-      },
+  Usage:
+  - /clear : Remove conversation history to start a new session.
+  - /help : Get more help messages.
+  `;
+  await reply(messageId, helpText, "Help");
+}
+
+async function cmdClear(sessionId, messageId) {
+  conversationHistories.delete(sessionId); // Clear session history
+  await reply(messageId, "✅ Conversation history cleared.");
+}
+
+async function queryFlowise(question, sessionId) {
+  const history = conversationHistories.get(sessionId) || [];
+  history.push(question);
+  conversationHistories.set(sessionId, history);
+
+  try {
+    const response = await fetch(FLOWISE_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: history.join(" ") }),
     });
+    const result = await response.json();
 
-    return response.data.image_key;
-  } catch (error) {
-    logger("Error uploading image to Lark", error);
-    throw error;
-  }
-}
-
-// Reply with an image
-async function replyWithImage(messageId, imageKey) {
-  return await client.im.message.reply({
-    path: { message_id: messageId },
-    data: {
-      content: JSON.stringify({ image_key: imageKey }),
-      msg_type: "image",
-    },
-  });
-}
-
-// Download the image from URL
-async function downloadImage(imageUrl, filePath) {
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    if (result.text) {
+      history.push(result.text);
+      conversationHistories.set(sessionId, history);
+      return result.text;
     }
-    const buffer = await response.buffer();
-    fs.writeFileSync(filePath, buffer);
+
+    throw new Error("Invalid response from Flowise API");
   } catch (error) {
-    logger("Error downloading image", error);
+    logger("Error querying Flowise API:", error);
     throw error;
   }
 }
 
-// Handle reply
 async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
   logger("Received question:", question);
@@ -126,25 +120,6 @@ async function handleReply(userInput, sessionId, messageId) {
 
   try {
     const answer = await queryFlowise(question, sessionId);
-
-    // Check if the response contains an image URL
-    if (userInput.artifacts && userInput.artifacts.length > 0) {
-      const imageArtifact = userInput.artifacts[0];
-      if (imageArtifact.type === "png") {
-        const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${userInput.chatflowId}&chatId=${userInput.chatId}&fileName=${imageArtifact.data}`;
-        const filePath = `/tmp/${path.basename(imageArtifact.data)}`;
-
-        // Download the image
-        await downloadImage(imageUrl, filePath);
-
-        // Upload the image to Lark
-        const imageKey = await uploadImage(filePath);
-
-        // Reply with the image
-        return await replyWithImage(messageId, imageKey);
-      }
-    }
-
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
@@ -154,7 +129,6 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 }
 
-// Validate Lark app configuration
 async function validateAppConfig() {
   if (!LARK_APP_ID || !LARK_APP_SECRET) {
     return { code: 1, message: "Missing Lark App ID or Secret" };
@@ -167,7 +141,6 @@ async function validateAppConfig() {
 
 const processedEvents = new Set();
 
-// Webhook handler
 app.post("/webhook", async (req, res) => {
   const { body: params } = req;
 
@@ -217,12 +190,10 @@ app.post("/webhook", async (req, res) => {
   return res.json({ code: 2 });
 });
 
-// Hello World route
 app.get("/hello", (req, res) => {
   res.json({ message: "Hello, World!" });
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
