@@ -80,6 +80,7 @@ async function reply(messageId, content, msgType = "text") {
   }
 }
 
+
 async function cmdHelp(messageId) {
   const helpText = `
   Lark GPT Commands
@@ -131,42 +132,17 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 
   try {
-    const answer = await queryFlowise(question, sessionId);
-    const response = JSON.parse(answer);
-
-    if (response.artifacts && response.artifacts.length > 0) {
-      const artifact = response.artifacts[0];
-      const fileIdentifier = artifact.data;
-      const fileType = artifact.type;
-
-      // Construct the URL to fetch the file from Flowise AI
-      const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${response.chatflowId}&chatId=${response.chatId}&fileName=${fileIdentifier}`;
-      
-      // Fetch the image data
-      const imageResponse = await fetch(imageUrl);
-      const imageBuffer = await imageResponse.buffer();
-
-      // Upload the image to Lark
-      const larkUploadResponse = await client.im.file.upload({
-        data: {
-          file: imageBuffer,
-          file_name: fileIdentifier,
-          file_type: fileType,
-        },
-      });
-
-      // Extract the URL of the uploaded image from Lark
-      const larkImageUrl = larkUploadResponse.data.file_url;
-
-      return await reply(messageId, larkImageUrl, "image");
-    }
-
-    return await reply(messageId, response.text || "⚠️ No response text found.");
+    // Example static image URL
+    const staticImageUrl = "https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=3e864985-2a49-4762-834b-d33b15311b48&chatId=2927ba73-2961-4473-88ff-c33b5f0566ad&fileName=artifact_1726657870359.png";
+    
+    // Test with static image URL
+    return await reply(messageId, staticImageUrl, "image");
   } catch (error) {
     logger("Error handling reply:", error);
     return await reply(messageId, "⚠️ An error occurred while processing your request.");
   }
 }
+
 
 
 async function validateAppConfig() {
