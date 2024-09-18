@@ -48,28 +48,25 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = "text") {
   try {
-    if (msgType === "image") {
-      return await client.im.message.reply({
-        path: { message_id: messageId },
-        data: {
-          content: JSON.stringify({
-            image_url: content,
-          }),
-          msg_type: msgType,
-        },
-      });
-    } else {
+    let data;
+
+    if (msgType === "text") {
       const formattedContent = formatMarkdown(content);
-      return await client.im.message.reply({
-        path: { message_id: messageId },
-        data: {
-          content: JSON.stringify({
-            text: formattedContent,
-          }),
-          msg_type: msgType,
-        },
-      });
+      data = {
+        content: JSON.stringify({ text: formattedContent }),
+        msg_type: msgType,
+      };
+    } else if (msgType === "image") {
+      data = {
+        content: JSON.stringify({ image_key: content }),
+        msg_type: msgType,
+      };
     }
+
+    return await client.im.message.reply({
+      path: { message_id: messageId },
+      data,
+    });
   } catch (e) {
     const errorCode = e?.response?.data?.code;
     if (errorCode === 230002) {
@@ -79,7 +76,6 @@ async function reply(messageId, content, msgType = "text") {
     }
   }
 }
-
 
 async function cmdHelp(messageId) {
   const helpText = `
@@ -131,19 +127,22 @@ async function handleReply(userInput, sessionId, messageId) {
     return await cmdProcess({ action: question, sessionId, messageId });
   }
 
+  if (question.toLowerCase() === "show image") {
+    const imageUrl =
+      "https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=3e864985-2a49-4762-834b-d33b15311b48&chatId=2927ba73-2961-4473-88ff-c33b5f0566ad&fileName=artifact_1726657870359.png";
+    return await reply(messageId, imageUrl, "image");
+  }
+
   try {
-    // Example static image URL
-    const staticImageUrl = "https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=3e864985-2a49-4762-834b-d33b15311b48&chatId=2927ba73-2961-4473-88ff-c33b5f0566ad&fileName=artifact_1726657870359.png";
-    
-    // Test with static image URL
-    return await reply(messageId, staticImageUrl, "image");
+    const answer = await queryFlowise(question, sessionId);
+    return await reply(messageId, answer);
   } catch (error) {
-    logger("Error handling reply:", error);
-    return await reply(messageId, "⚠️ An error occurred while processing your request.");
+    return await reply(
+      messageId,
+      "⚠️ An error occurred while processing your request."
+    );
   }
 }
-
-
 
 async function validateAppConfig() {
   if (!LARK_APP_ID || !LARK_APP_SECRET) {
