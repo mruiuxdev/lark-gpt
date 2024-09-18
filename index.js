@@ -48,16 +48,28 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = "text") {
   try {
-    const formattedContent = formatMarkdown(content);
-    return await client.im.message.reply({
-      path: { message_id: messageId },
-      data: {
-        content: JSON.stringify({
-          text: formattedContent,
-        }),
-        msg_type: msgType,
-      },
-    });
+    if (msgType === "image") {
+      return await client.im.message.reply({
+        path: { message_id: messageId },
+        data: {
+          content: JSON.stringify({
+            image_url: content,
+          }),
+          msg_type: msgType,
+        },
+      });
+    } else {
+      const formattedContent = formatMarkdown(content);
+      return await client.im.message.reply({
+        path: { message_id: messageId },
+        data: {
+          content: JSON.stringify({
+            text: formattedContent,
+          }),
+          msg_type: msgType,
+        },
+      });
+    }
   } catch (e) {
     const errorCode = e?.response?.data?.code;
     if (errorCode === 230002) {
@@ -120,7 +132,17 @@ async function handleReply(userInput, sessionId, messageId) {
 
   try {
     const answer = await queryFlowise(question, sessionId);
-    return await reply(messageId, answer);
+    const response = JSON.parse(answer);
+
+    if (response.artifacts && response.artifacts.length > 0) {
+      const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${response.chatflowId}&chatId=${response.chatId}&fileName=${response.artifacts[0].data}`;
+      return await reply(messageId, imageUrl, "image");
+    }
+
+    return await reply(
+      messageId,
+      response.text || "⚠️ No response text found."
+    );
   } catch (error) {
     return await reply(
       messageId,
