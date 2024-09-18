@@ -135,21 +135,39 @@ async function handleReply(userInput, sessionId, messageId) {
     const response = JSON.parse(answer);
 
     if (response.artifacts && response.artifacts.length > 0) {
-      const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${response.chatflowId}&chatId=${response.chatId}&fileName=${response.artifacts[0].data}`;
-      return await reply(messageId, imageUrl, "image");
+      const artifact = response.artifacts[0];
+      const fileIdentifier = artifact.data;
+      const fileType = artifact.type;
+
+      // Construct the URL to fetch the file from Flowise AI
+      const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${response.chatflowId}&chatId=${response.chatId}&fileName=${fileIdentifier}`;
+      
+      // Fetch the image data
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = await imageResponse.buffer();
+
+      // Upload the image to Lark
+      const larkUploadResponse = await client.im.file.upload({
+        data: {
+          file: imageBuffer,
+          file_name: fileIdentifier,
+          file_type: fileType,
+        },
+      });
+
+      // Extract the URL of the uploaded image from Lark
+      const larkImageUrl = larkUploadResponse.data.file_url;
+
+      return await reply(messageId, larkImageUrl, "image");
     }
 
-    return await reply(
-      messageId,
-      response.text || "⚠️ No response text found."
-    );
+    return await reply(messageId, response.text || "⚠️ No response text found.");
   } catch (error) {
-    return await reply(
-      messageId,
-      "⚠️ An error occurred while processing your request."
-    );
+    logger("Error handling reply:", error);
+    return await reply(messageId, "⚠️ An error occurred while processing your request.");
   }
 }
+
 
 async function validateAppConfig() {
   if (!LARK_APP_ID || !LARK_APP_SECRET) {
