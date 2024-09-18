@@ -2,8 +2,8 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-import fs from "fs";
-import path from "path";
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -42,8 +42,8 @@ async function cmdProcess({ action, sessionId, messageId }) {
 }
 
 function formatMarkdown(text) {
-  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>"); // **bold**
-  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>"); // *italic*
+  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");  // **bold**
+  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");      // *italic*
   return text;
 }
 
@@ -82,7 +82,7 @@ async function uploadImage(filePath) {
       },
     });
 
-    return response.data.image_key; // Return the image key from Lark
+    return response.data.image_key;
   } catch (error) {
     logger("Error uploading image to Lark", error);
     throw error;
@@ -100,50 +100,22 @@ async function replyWithImage(messageId, imageKey) {
   });
 }
 
-// Help command
-async function cmdHelp(messageId) {
-  const helpText = `
-  Lark GPT Commands:
-  - /clear : Remove conversation history to start a new session.
-  - /help : Get more help messages.
-  `;
-  await reply(messageId, helpText, "Help");
-}
-
-// Clear conversation history command
-async function cmdClear(sessionId, messageId) {
-  conversationHistories.delete(sessionId);
-  await reply(messageId, "✅ Conversation history cleared.");
-}
-
-// Query the Flowise API
-async function queryFlowise(question, sessionId) {
-  const history = conversationHistories.get(sessionId) || [];
-  history.push(question);
-  conversationHistories.set(sessionId, history);
-
+// Download the image from URL
+async function downloadImage(imageUrl, filePath) {
   try {
-    const response = await fetch(FLOWISE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: history.join(" ") }),
-    });
-    const result = await response.json();
-
-    if (result.text) {
-      history.push(result.text);
-      conversationHistories.set(sessionId, history);
-      return result.text;
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
     }
-
-    throw new Error("Invalid response from Flowise API");
+    const buffer = await response.buffer();
+    fs.writeFileSync(filePath, buffer);
   } catch (error) {
-    logger("Error querying Flowise API:", error);
+    logger("Error downloading image", error);
     throw error;
   }
 }
 
-// Function to handle reply and detect if it involves image generation
+// Handle reply
 async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
   logger("Received question:", question);
@@ -155,29 +127,24 @@ async function handleReply(userInput, sessionId, messageId) {
   try {
     const answer = await queryFlowise(question, sessionId);
 
-    // Check if the question is related to generating a chart or image
-    if (
-      question.toLowerCase().includes("histogram") ||
-      question.toLowerCase().includes("chart")
-    ) {
-      const filePath = "/tmp/work_hours_histogram.png"; // Assume the image is generated here
+    // Check if the response contains an image URL
+    if (userInput.artifacts && userInput.artifacts.length > 0) {
+      const imageArtifact = userInput.artifacts[0];
+      if (imageArtifact.type === "png") {
+        const imageUrl = `https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=${userInput.chatflowId}&chatId=${userInput.chatId}&fileName=${imageArtifact.data}`;
+        const filePath = `/tmp/${path.basename(imageArtifact.data)}`;
 
-      // Log the file path for debugging
-      console.log("Attempting to upload file:", filePath);
+        // Download the image
+        await downloadImage(imageUrl, filePath);
 
-      // Check if file exists and upload the image
-      const imageKey = await uploadImage(filePath);
+        // Upload the image to Lark
+        const imageKey = await uploadImage(filePath);
 
-      if (imageKey) {
         // Reply with the image
         return await replyWithImage(messageId, imageKey);
-      } else {
-        // If something goes wrong, send the text response
-        return await reply(messageId, answer);
       }
     }
 
-    // Otherwise, send the text answer
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
