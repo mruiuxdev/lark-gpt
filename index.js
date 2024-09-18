@@ -128,8 +128,14 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 
   if (question.toLowerCase() === "show image") {
+    const textMessage = "Here is the image you requested:";
     const imageUrl =
-      "https://chatflow-aowb.onrender.com/api/v1/get-upload-file?chatflowId=3e864985-2a49-4762-834b-d33b15311b48&chatId=2927ba73-2961-4473-88ff-c33b5f0566ad&fileName=artifact_1726657870359.png";
+      "https://www.internetgeography.net/wp-content/uploads/2019/12/Histogram-for-a-pedestrian-count-1030x730.png";
+
+    // First, send the text message
+    await reply(messageId, textMessage, "text");
+
+    // Then, send the image message
     return await reply(messageId, imageUrl, "image");
   }
 
