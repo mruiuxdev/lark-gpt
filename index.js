@@ -2,7 +2,7 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-import fs from "fs";
+
 dotenv.config();
 
 const app = express();
@@ -39,7 +39,9 @@ async function cmdProcess({ action, sessionId, messageId }) {
 }
 
 function formatMarkdown(text) {
+  // Replace **bold** with <strong>bold</strong>
   text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  // Replace *italic* with <em>italic</em>
   text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
@@ -78,48 +80,8 @@ async function cmdHelp(messageId) {
 }
 
 async function cmdClear(sessionId, messageId) {
-  conversationHistories.delete(sessionId);
+  conversationHistories.delete(sessionId); // Clear session history
   await reply(messageId, "✅ Conversation history cleared.");
-}
-
-async function uploadImageToLark(imagePath) {
-  try {
-    const response = await client.drive.file.upload({
-      body: {
-        file: {
-          name: "image.png",
-          content: fs.createReadStream(imagePath),
-        },
-        file_type: "image",
-      },
-    });
-    console.log("Upload response:", response);
-    return response.data.file_key;
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    throw error;
-  }
-}
-
-async function replyWithImage(messageId, imageKey) {
-  try {
-    return await client.im.message.reply({
-      path: { message_id: messageId },
-      data: {
-        content: JSON.stringify({
-          image_key: imageKey,
-        }),
-        msg_type: "image",
-      },
-    });
-  } catch (e) {
-    const errorCode = e?.response?.data?.code;
-    if (errorCode === 230002) {
-      logger("Bot/User is not in the chat anymore", e, messageId, imageKey);
-    } else {
-      logger("Error sending image to Lark", e, messageId, imageKey);
-    }
-  }
 }
 
 async function queryFlowise(question, sessionId) {
@@ -134,18 +96,6 @@ async function queryFlowise(question, sessionId) {
       body: JSON.stringify({ question: history.join(" ") }),
     });
     const result = await response.json();
-
-    console.log("Flowise API response:", result);
-
-    if (result.artifacts && result.artifacts.length > 0) {
-      const artifact = result.artifacts[0];
-
-      const imagePath = artifact.data;
-
-      const imageKey = await uploadImageToLark(imagePath);
-
-      await replyWithImage(sessionId, imageKey);
-    }
 
     if (result.text) {
       history.push(result.text);
