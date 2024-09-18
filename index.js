@@ -46,10 +46,11 @@ function formatMarkdown(text) {
   return text;
 }
 
-async function reply(messageId, content, msgType = "text") {
+async function reply(messageId, content, artifacts = [], msgType = "text") {
   try {
     const formattedContent = formatMarkdown(content);
-    return await client.im.message.reply({
+
+    await client.im.message.reply({
       path: { message_id: messageId },
       data: {
         content: JSON.stringify({
@@ -58,6 +59,20 @@ async function reply(messageId, content, msgType = "text") {
         msg_type: msgType,
       },
     });
+
+    for (const artifact of artifacts) {
+      if (artifact.type === "png") {
+        await client.im.message.reply({
+          path: { message_id: messageId },
+          data: {
+            content: JSON.stringify({
+              image_key: artifact.data,
+            }),
+            msg_type: "image",
+          },
+        });
+      }
+    }
   } catch (e) {
     const errorCode = e?.response?.data?.code;
     if (errorCode === 230002) {
@@ -119,8 +134,11 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 
   try {
-    const answer = await queryFlowise(question, sessionId);
-    return await reply(messageId, answer);
+    const flowiseResponse = await queryFlowise(question, sessionId);
+
+    const { text, artifacts = [] } = flowiseResponse;
+
+    return await reply(messageId, text, artifacts);
   } catch (error) {
     return await reply(
       messageId,
