@@ -114,6 +114,9 @@ async function queryFlowise(question, sessionId) {
     });
     const result = await response.json();
 
+    // Log the full response from Flowise
+    console.log("Flowise API response:", result);
+
     if (result.text) {
       history.push(result.text);
       conversationHistories.set(sessionId, history);
