@@ -48,24 +48,15 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = "text") {
   try {
-    let data;
-
-    if (msgType === "text") {
-      const formattedContent = formatMarkdown(content);
-      data = {
-        content: JSON.stringify({ text: formattedContent }),
-        msg_type: msgType,
-      };
-    } else if (msgType === "image") {
-      data = {
-        content: JSON.stringify({ image_key: content }),
-        msg_type: msgType,
-      };
-    }
-
+    const formattedContent = formatMarkdown(content);
     return await client.im.message.reply({
       path: { message_id: messageId },
-      data,
+      data: {
+        content: JSON.stringify({
+          text: formattedContent,
+        }),
+        msg_type: msgType,
+      },
     });
   } catch (e) {
     const errorCode = e?.response?.data?.code;
@@ -125,18 +116,6 @@ async function handleReply(userInput, sessionId, messageId) {
 
   if (question.startsWith("/")) {
     return await cmdProcess({ action: question, sessionId, messageId });
-  }
-
-  if (question.toLowerCase() === "show image") {
-    const textMessage = "Here is the image you requested:";
-    const imageUrl =
-      "https://www.internetgeography.net/wp-content/uploads/2019/12/Histogram-for-a-pedestrian-count-1030x730.png";
-
-    // First, send the text message
-    await reply(messageId, textMessage, "text");
-
-    // Then, send the image message
-    return await reply(messageId, imageUrl, "image");
   }
 
   try {
