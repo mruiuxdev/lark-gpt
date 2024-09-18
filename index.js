@@ -50,6 +50,7 @@ async function reply(messageId, content, artifacts = [], msgType = "text") {
   try {
     const formattedContent = formatMarkdown(content);
 
+    // Send the text response
     await client.im.message.reply({
       path: { message_id: messageId },
       data: {
@@ -60,13 +61,14 @@ async function reply(messageId, content, artifacts = [], msgType = "text") {
       },
     });
 
+    // Check and send artifacts if available (e.g., PNG files)
     for (const artifact of artifacts) {
       if (artifact.type === "png") {
         await client.im.message.reply({
           path: { message_id: messageId },
           data: {
             content: JSON.stringify({
-              image_key: artifact.data,
+              image_key: artifact.data, // Assuming this is the image key returned by Flowise
             }),
             msg_type: "image",
           },
@@ -115,7 +117,7 @@ async function queryFlowise(question, sessionId) {
     if (result.text) {
       history.push(result.text);
       conversationHistories.set(sessionId, history);
-      return result.text;
+      return result;
     }
 
     throw new Error("Invalid response from Flowise API");
@@ -126,7 +128,20 @@ async function queryFlowise(question, sessionId) {
 }
 
 async function handleReply(userInput, sessionId, messageId) {
-  const question = userInput.text.replace("@_user_1", "").trim();
+  console.log("User input received:", userInput); // Log the entire userInput object
+
+  // Check if `userInput.text` exists and handle the case where it's missing
+  const question = userInput.text
+    ? userInput.text.replace("@_user_1", "").trim()
+    : null;
+
+  if (!question) {
+    return await reply(
+      messageId,
+      "⚠️ Invalid input received. Please provide a valid question."
+    );
+  }
+
   logger("Received question:", question);
 
   if (question.startsWith("/")) {
@@ -136,8 +151,8 @@ async function handleReply(userInput, sessionId, messageId) {
   try {
     const flowiseResponse = await queryFlowise(question, sessionId);
 
+    // Extract text and artifacts from the response
     const { text, artifacts = [] } = flowiseResponse;
-
     return await reply(messageId, text, artifacts);
   } catch (error) {
     return await reply(
