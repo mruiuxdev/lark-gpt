@@ -2,6 +2,7 @@ import lark from "@larksuiteoapi/node-sdk";
 import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
+import fs from "fs";
 
 dotenv.config();
 
@@ -39,9 +40,7 @@ async function cmdProcess({ action, sessionId, messageId }) {
 }
 
 function formatMarkdown(text) {
-  // Replace **bold** with <strong>bold</strong>
   text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
-  // Replace *italic* with <em>italic</em>
   text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
@@ -80,7 +79,7 @@ async function cmdHelp(messageId) {
 }
 
 async function cmdClear(sessionId, messageId) {
-  conversationHistories.delete(sessionId); // Clear session history
+  conversationHistories.delete(sessionId);
   await reply(messageId, "✅ Conversation history cleared.");
 }
 
@@ -110,6 +109,39 @@ async function queryFlowise(question, sessionId) {
   }
 }
 
+// Function to upload image to Lark
+async function uploadImage(filePath) {
+  try {
+    const response = await client.im.image.create({
+      data: {
+        image_type: "message", // Image type, can also be "avatar" or "icon"
+        image: fs.createReadStream(filePath), // Upload image file
+      },
+    });
+
+    return response.data.image_key; // Return the image key to be used later
+  } catch (error) {
+    logger("Error uploading image to Lark", error);
+    throw error;
+  }
+}
+
+// Function to reply with an image
+async function replyWithImage(messageId, imageKey) {
+  try {
+    return await client.im.message.reply({
+      path: { message_id: messageId },
+      data: {
+        image_key: imageKey, // Use the image_key from the upload
+        msg_type: "image", // Specify that the message type is an image
+      },
+    });
+  } catch (e) {
+    logger("Error sending image to Lark", e, messageId);
+  }
+}
+
+// Handling user input and sending image if requested
 async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
   logger("Received question:", question);
@@ -120,6 +152,25 @@ async function handleReply(userInput, sessionId, messageId) {
 
   try {
     const answer = await queryFlowise(question, sessionId);
+
+    // Check if the question is related to generating a chart or image
+    if (
+      question.toLowerCase().includes("histogram") ||
+      question.toLowerCase().includes("chart")
+    ) {
+      // Assume Flowise API generates and saves the image at "/tmp/work_hours_histogram.png"
+      const imageKey = await uploadImage("/tmp/work_hours_histogram.png");
+
+      if (imageKey) {
+        // Reply with the image
+        return await replyWithImage(messageId, imageKey);
+      } else {
+        // If something goes wrong, send the text response
+        return await reply(messageId, answer);
+      }
+    }
+
+    // Otherwise, send the text answer
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
