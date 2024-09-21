@@ -21,7 +21,8 @@ const client = new lark.Client({
 
 app.use(express.json());
 
-const conversationHistories = new Map();
+// Only store the last session ID and its history
+const lastSessionMap = new Map();
 
 function logger(...params) {
   console.error(`[CF]`, ...params);
@@ -39,7 +40,9 @@ async function cmdProcess({ action, sessionId, messageId }) {
 }
 
 function formatMarkdown(text) {
+  // Replace **bold** with <strong>bold</strong>
   text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  // Replace *italic* with <em>italic</em>
   text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
@@ -78,27 +81,21 @@ async function cmdHelp(messageId) {
 }
 
 async function cmdClear(sessionId, messageId) {
-  conversationHistories.delete(sessionId);
+  lastSessionMap.delete(sessionId); // Clear the last session history
   await reply(messageId, "✅ Conversation history cleared.");
 }
 
-async function queryFlowise(question, sessionId) {
-  let history = conversationHistories.get(sessionId);
-  // ||
-  // question;
-
+async function queryFlowise(question) {
   try {
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: history }),
+      body: JSON.stringify({ question }),
     });
 
     const result = await response.json();
 
     if (result.text) {
-      history = `${question} ${result.text}`;
-      conversationHistories.set(sessionId, history);
       return result.text;
     }
 
@@ -111,14 +108,18 @@ async function queryFlowise(question, sessionId) {
 
 async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
-  logger("Received question:", question);
+  logger("Received question:", question, sessionId);
 
   if (question.startsWith("/")) {
     return await cmdProcess({ action: question, sessionId, messageId });
   }
 
   try {
-    const answer = await queryFlowise(question, sessionId);
+    const answer = await queryFlowise(question);
+
+    // Update the last session with the new question-response
+    lastSessionMap.set(sessionId, { question, answer });
+
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
