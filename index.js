@@ -21,7 +21,7 @@ const client = new lark.Client({
 
 app.use(express.json());
 
-const conversationHistories = new Map(); // Store only the last conversation entry per session
+const conversationHistories = new Map();
 
 function logger(...params) {
   console.error(`[CF]`, ...params);
@@ -80,24 +80,24 @@ async function cmdHelp(messageId) {
 }
 
 async function cmdClear(sessionId, messageId) {
-  conversationHistories.delete(sessionId); // Clear session history
+  conversationHistories.delete(sessionId);
   await reply(messageId, "✅ Conversation history cleared.");
 }
 
 async function queryFlowise(question, sessionId) {
-  // Only store the last question for each session
-  conversationHistories.set(sessionId, question);
+  conversationHistories.set(sessionId, [question]);
 
   try {
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }), // Only sending the current question
+      body: JSON.stringify({ question }),
     });
     const result = await response.json();
 
     if (result.text) {
-      return result.text; // Just return the latest response
+      conversationHistories.set(sessionId, [question, result.text]);
+      return result.text;
     }
 
     throw new Error("Invalid response from Flowise API");
