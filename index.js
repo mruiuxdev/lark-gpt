@@ -83,7 +83,7 @@ async function queryFlowise(question, sessionId) {
   const data = {
     question: question,
     overrideConfig: {
-      maxIterations: 1,
+      // maxIterations: 1,
       sessionId: sessionId,
     },
   };
