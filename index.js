@@ -11,8 +11,7 @@ const LARK_APP_ID = process.env.LARK_APP_ID || "";
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || "";
 const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
 
-const sessionMemory = new Map();
-
+// Initialize the Lark client
 const client = new lark.Client({
   appId: LARK_APP_ID,
   appSecret: LARK_APP_SECRET,
@@ -22,90 +21,29 @@ const client = new lark.Client({
 
 app.use(express.json());
 
+const conversationHistories = new Map(); // Store only the last conversation entry per session
+
 function logger(...params) {
   console.error(`[CF]`, ...params);
 }
 
-function storeUserName(sessionId, userName) {
-  sessionMemory.set(sessionId, { name: userName });
-}
-
-function getUserName(sessionId) {
-  const sessionData = sessionMemory.get(sessionId);
-  return sessionData ? sessionData.name : null;
-}
-
-async function queryFlowise(question, sessionId) {
-  try {
-    const response = await fetch(FLOWISE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, sessionId }),
-    });
-    const result = await response.json();
-    return result.text;
-  } catch (error) {
-    logger("Error querying Flowise API:", error);
-    throw error;
+async function cmdProcess({ action, sessionId, messageId }) {
+  switch (action) {
+    case "/help":
+      return await cmdHelp(messageId);
+    case "/clear":
+      return await cmdClear(sessionId, messageId);
+    default:
+      return await cmdHelp(messageId);
   }
 }
 
-async function handleReply(userInput, sessionId, messageId) {
-  // Extract text content safely
-  const messageText = userInput?.text
-    ? userInput.text.replace("@_user_1", "").trim()
-    : null;
-
-  if (!messageText) {
-    logger("Invalid message input, text content missing or malformed");
-    return await reply(
-      messageId,
-      "⚠️ Unable to process the message. Please send a valid text."
-    );
-  }
-
-  logger("Received question:", messageText);
-
-  if (messageText.startsWith("/")) {
-    return await cmdProcess({ action: messageText, sessionId, messageId });
-  }
-
-  // Check for user name in question
-  if (messageText.toLowerCase().includes("my name is")) {
-    const userName = messageText.split("my name is")[1].trim();
-    storeUserName(sessionId, userName);
-    return await reply(
-      messageId,
-      `Nice to meet you, ${userName}! How can I assist you today?`
-    );
-  }
-
-  // Check if the user is asking for their name
-  if (
-    messageText.toLowerCase().includes("what's my name") ||
-    messageText.toLowerCase().includes("what is my name")
-  ) {
-    const userName = getUserName(sessionId);
-    if (userName) {
-      return await reply(messageId, `Your name is ${userName}.`);
-    } else {
-      return await reply(
-        messageId,
-        "I don't know your name yet. Please tell me by saying 'My name is [your name]'."
-      );
-    }
-  }
-
-  // Query Flowise for other questions
-  try {
-    const answer = await queryFlowise(messageText, sessionId);
-    return await reply(messageId, answer);
-  } catch (error) {
-    return await reply(
-      messageId,
-      "⚠️ An error occurred while processing your request."
-    );
-  }
+function formatMarkdown(text) {
+  // Replace **bold** with <strong>bold</strong>
+  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  // Replace *italic* with <em>italic</em>
+  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
+  return text;
 }
 
 async function reply(messageId, content, msgType = "text") {
@@ -130,11 +68,75 @@ async function reply(messageId, content, msgType = "text") {
   }
 }
 
-function formatMarkdown(text) {
-  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
-  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
-  return text;
+async function cmdHelp(messageId) {
+  const helpText = `
+  Lark GPT Commands
+
+  Usage:
+  - /clear : Remove conversation history to start a new session.
+  - /help : Get more help messages.
+  `;
+  await reply(messageId, helpText, "Help");
 }
+
+async function cmdClear(sessionId, messageId) {
+  conversationHistories.delete(sessionId); // Clear session history
+  await reply(messageId, "✅ Conversation history cleared.");
+}
+
+async function queryFlowise(question, sessionId) {
+  // Only store the last question for each session
+  conversationHistories.set(sessionId, question);
+
+  try {
+    const response = await fetch(FLOWISE_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }), // Only sending the current question
+    });
+    const result = await response.json();
+
+    if (result.text) {
+      return result.text; // Just return the latest response
+    }
+
+    throw new Error("Invalid response from Flowise API");
+  } catch (error) {
+    logger("Error querying Flowise API:", error);
+    throw error;
+  }
+}
+
+async function handleReply(userInput, sessionId, messageId) {
+  const question = userInput.text.replace("@_user_1", "").trim();
+  logger("Received question:", question);
+
+  if (question.startsWith("/")) {
+    return await cmdProcess({ action: question, sessionId, messageId });
+  }
+
+  try {
+    const answer = await queryFlowise(question, sessionId);
+    return await reply(messageId, answer);
+  } catch (error) {
+    return await reply(
+      messageId,
+      "⚠️ An error occurred while processing your request."
+    );
+  }
+}
+
+async function validateAppConfig() {
+  if (!LARK_APP_ID || !LARK_APP_SECRET) {
+    return { code: 1, message: "Missing Lark App ID or Secret" };
+  }
+  if (!LARK_APP_ID.startsWith("cli_")) {
+    return { code: 1, message: "Lark App ID must start with 'cli_'" };
+  }
+  return { code: 0, message: "✅ Lark App configuration is valid." };
+}
+
+const processedEvents = new Set();
 
 app.post("/webhook", async (req, res) => {
   const { body: params } = req;
@@ -151,7 +153,8 @@ app.post("/webhook", async (req, res) => {
   }
 
   if (!params.header) {
-    return res.json({ code: 1, message: "Missing headers." });
+    const configValidation = await validateAppConfig();
+    return res.json(configValidation);
   }
 
   const { event_type: eventType, event_id: eventId } = params.header;
@@ -162,19 +165,30 @@ app.post("/webhook", async (req, res) => {
       chat_id: chatId,
       message_type: messageType,
     } = params.event.message;
-    const sessionId = params.event.session_id; // Use sessionId here
-    const userInput = JSON.parse(params.event.message.content);
+    const senderId = params.event.sender.sender_id.user_id;
+    const sessionId = `${chatId}${senderId}`;
+
+    if (processedEvents.has(eventId)) {
+      return res.json({ code: 0, message: "Duplicate event" });
+    }
+
+    processedEvents.add(eventId);
 
     if (messageType !== "text") {
       await reply(messageId, "Only text messages are supported.");
       return res.json({ code: 0 });
     }
 
+    const userInput = JSON.parse(params.event.message.content);
     const result = await handleReply(userInput, sessionId, messageId);
     return res.json(result);
   }
 
   return res.json({ code: 2 });
+});
+
+app.get("/hello", (req, res) => {
+  res.json({ message: "Hello, World!" });
 });
 
 app.listen(port, () => {
