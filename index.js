@@ -21,25 +21,25 @@ const client = new lark.Client({
 
 app.use(express.json());
 
+const conversationHistories = new Map();
+
 function logger(...params) {
   console.error(`[CF]`, ...params);
 }
 
-async function cmdProcess({ action, messageId }) {
+async function cmdProcess({ action, sessionId, messageId }) {
   switch (action) {
     case "/help":
       return await cmdHelp(messageId);
     case "/clear":
-      return await cmdClear(messageId);
+      return await cmdClear(sessionId, messageId);
     default:
       return await cmdHelp(messageId);
   }
 }
 
 function formatMarkdown(text) {
-  // Replace **bold** with <strong>bold</strong>
   text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
-  // Replace *italic* with <em>italic</em>
   text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
   return text;
 }
@@ -77,20 +77,26 @@ async function cmdHelp(messageId) {
   await reply(messageId, helpText, "Help");
 }
 
-async function cmdClear(messageId) {
+async function cmdClear(sessionId, messageId) {
+  conversationHistories.delete(sessionId);
   await reply(messageId, "✅ Conversation history cleared.");
 }
 
-async function queryFlowise(question) {
+async function queryFlowise(question, sessionId) {
+  let history = conversationHistories.get(sessionId) || question;
+
   try {
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question: history }),
     });
+
     const result = await response.json();
 
     if (result.text) {
+      history = `${question} ${result.text}`;
+      conversationHistories.set(sessionId, history);
       return result.text;
     }
 
@@ -101,16 +107,16 @@ async function queryFlowise(question) {
   }
 }
 
-async function handleReply(userInput, messageId) {
+async function handleReply(userInput, sessionId, messageId) {
   const question = userInput.text.replace("@_user_1", "").trim();
   logger("Received question:", question);
 
   if (question.startsWith("/")) {
-    return await cmdProcess({ action: question, messageId });
+    return await cmdProcess({ action: question, sessionId, messageId });
   }
 
   try {
-    const answer = await queryFlowise(question);
+    const answer = await queryFlowise(question, sessionId);
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
@@ -160,6 +166,7 @@ app.post("/webhook", async (req, res) => {
       message_type: messageType,
     } = params.event.message;
     const senderId = params.event.sender.sender_id.user_id;
+    const sessionId = `${chatId}${senderId}`;
 
     if (processedEvents.has(eventId)) {
       return res.json({ code: 0, message: "Duplicate event" });
@@ -173,7 +180,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     const userInput = JSON.parse(params.event.message.content);
-    const result = await handleReply(userInput, messageId);
+    const result = await handleReply(userInput, sessionId, messageId);
     return res.json(result);
   }
 
