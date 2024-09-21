@@ -83,9 +83,9 @@ async function cmdClear(sessionId, messageId) {
 }
 
 async function queryFlowise(question, sessionId) {
-  let history =
-    // conversationHistories.get(sessionId) ||
-    question;
+  let history = conversationHistories.get(sessionId);
+  // ||
+  // question;
 
   try {
     const response = await fetch(FLOWISE_API_URL, {
