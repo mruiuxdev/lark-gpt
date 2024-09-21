@@ -85,20 +85,19 @@ async function cmdClear(sessionId, messageId) {
 }
 
 async function queryFlowise(question, sessionId) {
-  // Start fresh with the current question
   const history = [question];
 
   try {
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }), // Send only the current question
+      body: JSON.stringify({ question }),
     });
     const result = await response.json();
 
     if (result.text) {
-      history.push(result.text); // Append the response
-      conversationHistories.set(sessionId, history); // Store the current question and response
+      history.push(result.text);
+      conversationHistories.set(sessionId, history);
       return result.text;
     }
 
@@ -168,7 +167,9 @@ app.post("/webhook", async (req, res) => {
       message_type: messageType,
     } = params.event.message;
     const senderId = params.event.sender.sender_id.user_id;
-    const sessionId = `${chatId}${senderId}`;
+
+    const sessionId =
+      params.event.overrideConfig?.sessionId || `${chatId}${senderId}`;
 
     if (processedEvents.has(eventId)) {
       return res.json({ code: 0, message: "Duplicate event" });
