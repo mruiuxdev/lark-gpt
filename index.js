@@ -1,102 +1,22 @@
-import lark from "@larksuiteoapi/node-sdk";
-import dotenv from "dotenv";
-import express from "express";
-import fetch from "node-fetch";
-
-dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 3000;
-
-const LARK_APP_ID = process.env.LARK_APP_ID || "";
-const LARK_APP_SECRET = process.env.LARK_APP_SECRET || "";
-const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
-
-const client = new lark.Client({
-  appId: LARK_APP_ID,
-  appSecret: LARK_APP_SECRET,
-  disableTokenCache: false,
-  domain: lark.Domain.Lark,
-});
-
-app.use(express.json());
-
-// Only store the last session ID and its history
-const lastSessionMap = new Map();
-
-function logger(...params) {
-  console.error(`[CF]`, ...params);
-}
-
-async function cmdProcess({ action, sessionId, messageId }) {
-  switch (action) {
-    case "/help":
-      return await cmdHelp(messageId);
-    case "/clear":
-      return await cmdClear(sessionId, messageId);
-    default:
-      return await cmdHelp(messageId);
-  }
-}
-
-function formatMarkdown(text) {
-  // Replace **bold** with <strong>bold</strong>
-  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
-  // Replace *italic* with <em>italic</em>
-  text = text.replace(/\*(.*?)\*/g, "<i>$1</i>");
-  return text;
-}
-
-async function reply(messageId, content, msgType = "text") {
+async function queryFlowise(question, sessionId) {
   try {
-    const formattedContent = formatMarkdown(content);
-    return await client.im.message.reply({
-      path: { message_id: messageId },
-      data: {
-        content: JSON.stringify({
-          text: formattedContent,
-        }),
-        msg_type: msgType,
-      },
-    });
-  } catch (e) {
-    const errorCode = e?.response?.data?.code;
-    if (errorCode === 230002) {
-      logger("Bot/User is not in the chat anymore", e, messageId, content);
-    } else {
-      logger("Error sending message to Lark", e, messageId, content);
-    }
-  }
-}
-
-async function cmdHelp(messageId) {
-  const helpText = `
-  Lark GPT Commands
-
-  Usage:
-  - /clear : Remove conversation history to start a new session.
-  - /help : Get more help messages.
-  `;
-  await reply(messageId, helpText, "Help");
-}
-
-async function cmdClear(sessionId, messageId) {
-  lastSessionMap.delete(sessionId); // Clear the last session history
-  await reply(messageId, "✅ Conversation history cleared.");
-}
-
-async function queryFlowise(question) {
-  try {
+    // Send question to Flowise API and pass sessionId
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, sessionId }),  // Include sessionId in the request
     });
 
     const result = await response.json();
 
     if (result.text) {
-      return result.text;
+      // Check if sessionId is updated in the response
+      const newSessionId = result.sessionId || sessionId;
+
+      // Update session history with the latest sessionId and response
+      lastSessionMap.set(newSessionId, { question, answer: result.text });
+
+      return { text: result.text, sessionId: newSessionId };  // Return updated sessionId
     }
 
     throw new Error("Invalid response from Flowise API");
@@ -115,12 +35,14 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 
   try {
-    const answer = await queryFlowise(question);
+    // Query Flowise and receive the updated sessionId and response text
+    const { text, sessionId: newSessionId } = await queryFlowise(question, sessionId);
 
-    // Update the last session with the new question-response
-    lastSessionMap.set(sessionId, { question, answer });
+    // Update last session with the latest sessionId
+    lastSessionMap.set(newSessionId, { question, text });
 
-    return await reply(messageId, answer);
+    // Reply to the user
+    return await reply(messageId, text);
   } catch (error) {
     return await reply(
       messageId,
@@ -128,18 +50,6 @@ async function handleReply(userInput, sessionId, messageId) {
     );
   }
 }
-
-async function validateAppConfig() {
-  if (!LARK_APP_ID || !LARK_APP_SECRET) {
-    return { code: 1, message: "Missing Lark App ID or Secret" };
-  }
-  if (!LARK_APP_ID.startsWith("cli_")) {
-    return { code: 1, message: "Lark App ID must start with 'cli_'" };
-  }
-  return { code: 0, message: "✅ Lark App configuration is valid." };
-}
-
-const processedEvents = new Set();
 
 app.post("/webhook", async (req, res) => {
   const { body: params } = req;
@@ -183,17 +93,12 @@ app.post("/webhook", async (req, res) => {
     }
 
     const userInput = JSON.parse(params.event.message.content);
+
+    // Handle the reply and use sessionId
     const result = await handleReply(userInput, sessionId, messageId);
+
     return res.json(result);
   }
 
   return res.json({ code: 2 });
-});
-
-app.get("/hello", (req, res) => {
-  res.json({ message: "Hello, World!" });
-});
-
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
 });
