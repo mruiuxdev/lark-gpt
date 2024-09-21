@@ -85,21 +85,20 @@ async function cmdClear(sessionId, messageId) {
 }
 
 async function queryFlowise(question, sessionId) {
-  const history = conversationHistories.get(sessionId) || [];
-  history.push(question); // Append the current question
-  const context = history.join("\n"); // Format history as needed
+  // Start fresh with the current question
+  const history = [question];
 
   try {
     const response = await fetch(FLOWISE_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: context }), // Send context
+      body: JSON.stringify({ question }), // Send only the current question
     });
     const result = await response.json();
 
     if (result.text) {
       history.push(result.text); // Append the response
-      conversationHistories.set(sessionId, history); // Update history again
+      conversationHistories.set(sessionId, history); // Store the current question and response
       return result.text;
     }
 
