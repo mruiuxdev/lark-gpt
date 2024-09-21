@@ -11,7 +11,6 @@ const LARK_APP_ID = process.env.LARK_APP_ID || "";
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || "";
 const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
 
-// In-memory store for simplicity. Can be replaced with Redis for persistence.
 const sessionMemory = new Map();
 
 const client = new lark.Client({
@@ -52,16 +51,28 @@ async function queryFlowise(question, sessionId) {
 }
 
 async function handleReply(userInput, sessionId, messageId) {
-  const question = userInput.text.replace("@_user_1", "").trim();
-  logger("Received question:", question);
+  // Extract text content safely
+  const messageText = userInput?.text
+    ? userInput.text.replace("@_user_1", "").trim()
+    : null;
 
-  if (question.startsWith("/")) {
-    return await cmdProcess({ action: question, sessionId, messageId });
+  if (!messageText) {
+    logger("Invalid message input, text content missing or malformed");
+    return await reply(
+      messageId,
+      "⚠️ Unable to process the message. Please send a valid text."
+    );
+  }
+
+  logger("Received question:", messageText);
+
+  if (messageText.startsWith("/")) {
+    return await cmdProcess({ action: messageText, sessionId, messageId });
   }
 
   // Check for user name in question
-  if (question.toLowerCase().includes("my name is")) {
-    const userName = question.split("my name is")[1].trim();
+  if (messageText.toLowerCase().includes("my name is")) {
+    const userName = messageText.split("my name is")[1].trim();
     storeUserName(sessionId, userName);
     return await reply(
       messageId,
@@ -71,8 +82,8 @@ async function handleReply(userInput, sessionId, messageId) {
 
   // Check if the user is asking for their name
   if (
-    question.toLowerCase().includes("what's my name") ||
-    question.toLowerCase().includes("what is my name")
+    messageText.toLowerCase().includes("what's my name") ||
+    messageText.toLowerCase().includes("what is my name")
   ) {
     const userName = getUserName(sessionId);
     if (userName) {
@@ -87,7 +98,7 @@ async function handleReply(userInput, sessionId, messageId) {
 
   // Query Flowise for other questions
   try {
-    const answer = await queryFlowise(question, sessionId);
+    const answer = await queryFlowise(messageText, sessionId);
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
@@ -151,7 +162,7 @@ app.post("/webhook", async (req, res) => {
       chat_id: chatId,
       message_type: messageType,
     } = params.event.message;
-    const sessionId = params.event.session_id; // Grab the sessionId here
+    const sessionId = params.event.session_id; // Use sessionId here
     const userInput = JSON.parse(params.event.message.content);
 
     if (messageType !== "text") {
