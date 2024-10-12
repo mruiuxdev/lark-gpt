@@ -1,6 +1,7 @@
 const lark = require("@larksuiteoapi/node-sdk");
 const dotenv = require("dotenv");
 const express = require("express");
+const cors = require("cors");
 
 dotenv.config();
 
@@ -10,6 +11,14 @@ const port = process.env.PORT || 3000;
 const LARK_APP_ID = process.env.LARK_APP_ID || "";
 const LARK_APP_SECRET = process.env.LARK_APP_SECRET || "";
 const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
+
+app.use(
+  cors({
+    origin: "*", // You can restrict this to specific domains, such as Azure, by replacing '*' with allowed domains
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // Initialize the Lark client
 const client = new lark.Client({
