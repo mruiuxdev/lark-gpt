@@ -18,7 +18,7 @@ async function queryFlowise(question, sessionId) {
   const data = {
     question: question,
     overrideConfig: {
-      sessionId: sessionId,
+      sessionId: sessionId || "default-session",  // Provide a default sessionId if none is given
     },
   };
 
@@ -28,30 +28,44 @@ async function queryFlowise(question, sessionId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    const result = await response.json();
 
-    if (result.text) {
+    if (!response.ok) {
+      throw new Error(`Flowise API returned an error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (result && result.text) {
       return result.text;
     }
 
     throw new Error("Invalid response from Flowise API");
   } catch (error) {
-    logger("Error querying Flowise API:", error);
+    logger("Error querying Flowise API:", error.message);
     throw error;
   }
 }
 
 // Handle Microsoft Teams incoming requests
 app.post("/teams-webhook", async (req, res) => {
-  const { text, sessionId, messageId } = req.body;
+  const { text, sessionId } = req.body;
+
+  // Validate the input
+  if (!text || !sessionId) {
+    return res.status(400).json({ error: "Invalid input. 'text' and 'sessionId' are required." });
+  }
 
   try {
     const answer = await queryFlowise(text, sessionId);
     res.json({ message: answer });
   } catch (error) {
-    logger("Error handling Teams webhook:", error);
-    res.status(500).json({ error: "Error processing request" });
+    logger("Error handling Teams webhook:", error.message);
+    res.status(500).json({ error: "Internal Server Error. Please try again later." });
   }
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "UP", message: "Teams webhook is running" });
 });
 
 const port = process.env.PORT || 3000;
