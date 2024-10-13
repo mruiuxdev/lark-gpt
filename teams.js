@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 dotenv.config();
 
 const app = express();
-app.use(express.json()); // Ensure JSON parsing
+app.use(express.json());
 
 const FLOWISE_API_URL = process.env.FLOWISE_API_URL || "";
 
@@ -68,9 +68,9 @@ app.get("/health", (req, res) => {
   res.json({ status: "UP", message: "Teams webhook is running" });
 });
 
-// Catch-all route to serve the front-end HTML (Put this AFTER the webhook routes)
+// Catch-all route for serving the frontend (Make sure this is the last route!)
 app.get("*", (req, res) => {
-  res.status(404).json({ error: "Not Found" }); // Returning 404 for undefined routes
+  res.status(404).json({ error: "Not Found" });  // Handle non-existent routes
 });
 
 const port = process.env.PORT || 3000;
