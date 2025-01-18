@@ -44,6 +44,24 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = 'text') {
   try {
+    const file = fs.readFileSync(`${__dirname}/kitten.png`);
+
+    await client.im.image
+      .create(
+        {
+          data: {
+            image_type: 'message',
+            image: file,
+          },
+        },
+        lark.withTenantToken('t-7f1b******8e560')
+      )
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((e) => {
+        console.error(JSON.stringify(e.response.data, null, 4));
+      });
     const formattedContent = formatMarkdown(content);
     return await client.im.message.reply({
       path: { message_id: messageId },
@@ -85,14 +103,14 @@ async function queryFlowise(question, sessionId) {
     overrideConfig: {
       // maxIterations: 1,
       sessionId: sessionId,
-      uploads: [
-        {
-          data: 'http://micromind-api-dev.onrender.com/uploads/chat-uploads/file-1737156953570-kitten.png',
-          type: 'url',
-          name: 'file-1737156953570-kitten.png',
-          mime: 'image/jpeg',
-        },
-      ],
+      // uploads: [
+      //   {
+      //     data: 'http://micromind-api-dev.onrender.com/uploads/chat-uploads/file-1737156953570-kitten.png',
+      //     type: 'url',
+      //     name: 'file-1737156953570-kitten.png',
+      //     mime: 'image/jpeg',
+      //   },
+      // ],
     },
   };
 
