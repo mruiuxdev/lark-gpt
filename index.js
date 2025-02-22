@@ -82,6 +82,27 @@ async function reply(messageId, content, msgType = 'text') {
   }
 }
 
+// Function to download images or files
+async function downloadResource(resourceKey, resourceType) {
+  const url = `https://open.larksuite.com/open-apis/${resourceType}/v1/get`;
+  try {
+    const response = await axios.get(url, {
+      params: { [`${resourceType}_key`]: resourceKey },
+      headers: {
+        Authorization: `Bearer ${client.tokenManager.getTenantAccessToken()}`,
+      },
+      responseType: 'arraybuffer', // Ensures binary data
+    });
+
+    console.log({ url });
+    console.log('response.data', response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error downloading ${resourceType}:`, error);
+    throw error;
+  }
+}
+
 async function cmdHelp(messageId) {
   const helpText = `
   Lark GPT Commands
@@ -97,9 +118,10 @@ async function cmdClear(sessionId, messageId) {
   await reply(messageId, '✅ Conversation history cleared.');
 }
 
-async function queryFlowise(question, sessionId) {
+async function queryFlowise(question, sessionId, uploads = []) {
   const data = {
     question: question,
+    uploads,
     overrideConfig: {
       // maxIterations: 1,
       sessionId: sessionId,
@@ -202,14 +224,35 @@ app.post('/webhook', async (req, res) => {
 
     processedEvents.add(eventId);
 
-    if (messageType !== 'text') {
-      await reply(messageId, 'Only text messages are supported.');
+    if (messageType === 'text') {
+      const userInput = JSON.parse(content);
+      const result = await handleReply(userInput, sessionId, messageId);
+      return res.json(result);
+    } else if (messageType === 'image' || messageType === 'file') {
+      const resourceKey = JSON.parse(content)[`${messageType}_key`];
+      if (!resourceKey) {
+        await reply(messageId, '⚠️ Failed to extract resource key.');
+        return res.json({ code: 0 });
+      }
+
+      try {
+        const resourceData = await downloadResource(resourceKey, messageType);
+        // Process the resourceData as needed
+        await reply(messageId, `📎 Received and processed the ${messageType}.`);
+        console.log({ resourceData });
+        console.log(`Received and processed the ${messageType}.`);
+      } catch (error) {
+        await reply(messageId, '⚠️ Error processing the resource.');
+      }
+
+      return res.json({ code: 0 });
+    } else {
+      await reply(
+        messageId,
+        'Only text, image, and file messages are supported.'
+      );
       return res.json({ code: 0 });
     }
-
-    const userInput = JSON.parse(params.event.message.content);
-    const result = await handleReply(userInput, sessionId, messageId);
-    return res.json(result);
   }
 
   return res.json({ code: 2 });
