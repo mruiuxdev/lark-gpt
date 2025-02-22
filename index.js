@@ -44,7 +44,7 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = 'text') {
   try {
-    const file = fs.readFileSync(`${__dirname}/kitten.png`);
+    // const file = fs.readFileSync(`${__dirname}/kitten.png`);
 
     await client.im.image
       .create(
@@ -212,7 +212,7 @@ app.post('/webhook', async (req, res) => {
       message_id: messageId,
       chat_id: chatId,
       message_type: messageType,
-      content
+      content,
     } = params.event.message;
     const senderId = params.event.sender.sender_id.user_id;
 
