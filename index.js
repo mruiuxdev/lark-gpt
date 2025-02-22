@@ -155,7 +155,7 @@ async function queryFlowise(question, sessionId, uploads = []) {
   }
 }
 
-async function handleReply(userInput, sessionId, messageId) {
+async function handleReply(userInput, sessionId, messageId, uploads = []) {
   const question = userInput.text.replace('@_user_1', '').trim();
   logger('Received question:', question);
 
@@ -164,7 +164,7 @@ async function handleReply(userInput, sessionId, messageId) {
   }
 
   try {
-    const answer = await queryFlowise(question, sessionId);
+    const answer = await queryFlowise(question, sessionId, uploads);
     return await reply(messageId, answer);
   } catch (error) {
     return await reply(
@@ -212,6 +212,7 @@ app.post('/webhook', async (req, res) => {
       message_id: messageId,
       chat_id: chatId,
       message_type: messageType,
+      content
     } = params.event.message;
     const senderId = params.event.sender.sender_id.user_id;
 
@@ -223,6 +224,8 @@ app.post('/webhook', async (req, res) => {
     }
 
     processedEvents.add(eventId);
+
+    console.log({ messageType });
 
     if (messageType === 'text') {
       const userInput = JSON.parse(content);
