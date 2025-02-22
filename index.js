@@ -44,24 +44,6 @@ function formatMarkdown(text) {
 
 async function reply(messageId, content, msgType = 'text') {
   try {
-    // const file = fs.readFileSync(`${__dirname}/kitten.png`);
-
-    await client.im.image
-      .create(
-        {
-          data: {
-            image_type: 'message',
-            image: file,
-          },
-        },
-        lark.withTenantToken('t-7f1b******8e560')
-      )
-      .then((res) => {
-        console.log(res);
-      })
-      .catch((e) => {
-        console.error(JSON.stringify(e.response.data, null, 4));
-      });
     const formattedContent = formatMarkdown(content);
     return await client.im.message.reply({
       path: { message_id: messageId },
