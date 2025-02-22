@@ -67,8 +67,12 @@ async function reply(messageId, content, msgType = 'text') {
 
 // Function to download images or files
 async function downloadResource(resourceKey, resourceType) {
-  const url = `https://open.larksuite.com/open-apis/${resourceType}/v1/get`;
+  const url = `https://open.larksuite.com/open-apis/im/v1/files/${fileKey}`;
+  // const url = `https://open.larksuite.com/open-apis/im/v1/messages/${messageId}/resources/${fileKey}`;
+  // const url = `https://open.larksuite.com/open-apis/${resourceType}/v1/get`;
   try {
+    console.log('Downloading file from:', url);
+
     const response = await axios.get(url, {
       params: { [`${resourceType}_key`]: resourceKey },
       headers: {
